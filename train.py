@@ -4,34 +4,38 @@ import torch
 import numpy as np
 from torch import nn
 from torch import optim
-from torchsummary import summary
+from pathlib import Path
 from network import SpringNetwork
 from dataset import SimulatorDataset
+from torch.utils.data import DataLoader
 
 if __name__=='__main__':
 
     # Set some parameters
     device = torch.device('cuda')
     root = Path('checkpoints')
-    train_path = '../dataset/train'
-    val_path = '../dataset/val'
-    lr = 0.0001
+    train_path = '../dataset/2019-07-30/data'
+    val_path = '../dataset/2019-07-30/calibration'
+    lr = 1e-7
     momentum = 0.9
     batch_size = 8
     num_workers = 8
     n_epochs = 500
     validate_each = 5
-
-    train_dataset = SimulatorDataset(train_kinematics_file=train_path+'_kinematics.csv', simulator_file=train_path+'_simulator.csv', label_file=train_path+'_polaris.csv')
-    val_dataset = SimulatorDataset(val_kinematics_file=val_path+'_kinematics.csv', simulator_file=val_path+'_simulator.csv', label_file=val_path+'_polaris.csv')
+    # Input info: 7 coordinates of the tabletoe = 7 + 7 pos from dVRK
+    input_size = 14
+    output_size = 7
+    
+    train_dataset = SimulatorDataset(kinematics_file=train_path+'_cartesian_processed.csv', simulator_file=train_path+'_cartesian_simulation.csv', label_file=train_path+'_polaris_processed.csv')
+    val_dataset = SimulatorDataset(kinematics_file=val_path+'_cartesian_processed.csv', simulator_file=val_path+'_cartesian_simulation.csv', label_file=val_path+'_polaris_processed.csv')
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
-    val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     
     # If loading from previous model
     use_previous_model = False
     epoch_to_use = 0
 
-    net = SpringNetwork
+    net = SpringNetwork(input_size=input_size, output_size=output_size)
     loss_fn = nn.MSELoss()
     optimizer = optim.SGD(net.parameters(), lr=lr, momentum=momentum)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer)
@@ -69,7 +73,6 @@ if __name__=='__main__':
         step = 0
         best_mean_error = 0.0
         net = utils.init_net(net)
-        summary(net)
 
     # List things to save
     save = lambda ep, model, model_path, error, optimizer, scheduler: torch.save({
@@ -80,11 +83,10 @@ if __name__=='__main__':
         'optimizer': optimizer.state_dict(),
         'scheduler': scheduler.state_dict()
     }, str(model_path))
-
+    log = model_root.joinpath('train.log').open('at', encoding='utf8')
 
     try:    
         for e in range(epoch, n_epochs + 1):
-            scheduler.step()
             for param_group in optimizer.param_groups:
                 print('Learning rate ', param_group['lr'])
         
@@ -97,6 +99,7 @@ if __name__=='__main__':
             for i, (input_data, label_data) in enumerate(train_loader):
                 input_data, label_data = input_data.to(device), label_data.to(device)
                 pred  = net(input_data)
+                print(pred[0])
                 loss = loss_fn(pred, label_data)
                 epoch_loss += loss.item()
 
@@ -110,6 +113,7 @@ if __name__=='__main__':
                 
             if e % validate_each == 0:
                 torch.cuda.empty_cache()
+                all_val_loss = []
                 counter=  0
                 with torch.no_grad():
                     net.eval()
@@ -121,6 +125,7 @@ if __name__=='__main__':
                             
                 mean_loss = np.mean(all_val_loss)
                 tq.set_postfix(loss='validation loss={:5f}'.format(mean_loss))
+                scheduler.step(mean_loss)
 
                 best_mean_rec_loss = mean_loss
                 model_path = model_root / "model_{}.pt".format(epoch)

@@ -1,6 +1,6 @@
 import json
 import torch
-from torch.import nn
+from torch import nn
 from datetime import datetime
 
 

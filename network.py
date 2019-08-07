@@ -4,21 +4,24 @@ from torch import nn
 # Testing fully connected networks for predicting positions
 class SpringNetwork(nn.Module):
 
-    def __init__(self):
+    def __init__(self, input_size, output_size):
         super(SpringNetwork, self).__init__()
-        # Input info: 4 points of the tabletop * 3 coordinate = 12 + 7 pos, 7 vel from dVRK = 26
-        model = nn.Sequential(
-            nn.Linear(26, 128),
-            nn.ReLU(),
-            nn.Linear(128, 256),
-            nn.ReLU()
-            nn.Linear(256, 128),
-            nn.ReLU(),
-            nn.Linear(128, 12)
-            )
+        self.l1 = nn.Linear(input_size, 128)
+        self.l2 = nn.Linear(128, 256)
+        self.l3 = nn.Linear(256, 128)
+        self.l4 = nn.Linear(128, output_size)
+        self.activation = nn.ReLU()
 
     def forward(self, x):
-        return self.model(x)
+        x = self.l1(x)
+        x = self.activation(x)
+        x = self.l2(x)
+        x = self.activation(x)
+        x = self.l3(x)
+        x = self.activation(x)
+        x = self.l4(x)
+        
+        return x
 
     
     
