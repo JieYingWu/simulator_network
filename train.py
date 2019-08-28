@@ -14,9 +14,9 @@ if __name__=='__main__':
     # Set some parameters
     device = torch.device('cuda')
     root = Path('checkpoints')
-    train_path = '../dataset/2019-07-30/data'
-    val_path = '../dataset/2019-07-30/calibration'
-    lr = 1e-7
+    train_path = '../dataset/test/data_long'
+    val_path = '../dataset/test/data1'
+    lr = 1e-10
     momentum = 0.9
     batch_size = 8
     num_workers = 8
@@ -83,23 +83,21 @@ if __name__=='__main__':
         'optimizer': optimizer.state_dict(),
         'scheduler': scheduler.state_dict()
     }, str(model_path))
-    log = model_root.joinpath('train.log').open('at', encoding='utf8')
 
     try:    
         for e in range(epoch, n_epochs + 1):
-            for param_group in optimizer.param_groups:
-                print('Learning rate ', param_group['lr'])
+#            for param_group in optimizer.param_groups:
+#                print('Learning rate ', param_group['lr'])
         
             net.train()
 
             tq = tqdm.tqdm(total=(len(train_loader) * batch_size))
-            tq.set_description('Epoch {}, lr {}'.format(epoch, lr))
+            tq.set_description('Epoch {}, lr {}'.format(e, lr))
             epoch_loss = 0
 
             for i, (input_data, label_data) in enumerate(train_loader):
                 input_data, label_data = input_data.to(device), label_data.to(device)
                 pred  = net(input_data)
-                print(pred[0])
                 loss = loss_fn(pred, label_data)
                 epoch_loss += loss.item()
 
@@ -128,10 +126,9 @@ if __name__=='__main__':
                 scheduler.step(mean_loss)
 
                 best_mean_rec_loss = mean_loss
-                model_path = model_root / "model_{}.pt".format(epoch)
-                save(epoch, net, model_path, best_mean_rec_loss, optimizer, scheduler)
+                model_path = model_root / "model_{}.pt".format(e)
+                save(e, net, model_path, best_mean_rec_loss, optimizer, scheduler)
             
-            utils.write_event(log, step, loss=mean_loss)
             tq.close()
 
     except KeyboardInterrupt:

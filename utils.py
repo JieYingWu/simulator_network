@@ -26,9 +26,9 @@ def kaiming_weight_zero_bias(model, mode="fan_in", activation_mode="relu", distr
                 torch.nn.init.constant_(module.bias, 0)
                 
 
-def write_event(log, step: int, **data):
-    data['step'] = step
-    data['dt'] = datetime.now().isoformat()
-    log.write(json.dumps(data, sort_keys=True))
-    log.write('\n')
-    log.flush()
+#def write_event(log, step: int, **data):
+#    data['step'] = step
+#    data['dt'] = datetime.now().isoformat()
+#    log.write(json.dumps(data, sort_keys=True))
+#    log.write('\n')
+#    log.flush()
