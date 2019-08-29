@@ -35,9 +35,9 @@ if __name__=='__main__':
     use_previous_model = False
     epoch_to_use = 0
 
-    net = SpringNetwork(input_size=input_size, output_size=output_size)
+    model = SpringNetwork(input_size=input_size, output_size=output_size)
     loss_fn = nn.MSELoss()
-    optimizer = optim.SGD(net.parameters(), lr=lr, momentum=momentum)
+    optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer)
 
     # Make directories for saving models and results
@@ -60,10 +60,10 @@ if __name__=='__main__':
             state = torch.load(str(path))
             epoch = state['epoch'] + 1
             step = state['step']
-            net.load_state_dict(state['model'])
+            model.load_state_dict(state['model'])
             optimizer.load_state_dict(state['optimizer'])
             scheduler.load_state_dict(state['scheduler'])
-
+            best_mean_error = state['error']
             print('Restored model, epoch {}, step {:,}'.format(epoch, step))
         else:
             print('Failed to restore model')
@@ -72,7 +72,7 @@ if __name__=='__main__':
         epoch = 1
         step = 0
         best_mean_error = 0.0
-        net = utils.init_net(net)
+        model = utils.init_net(model)
 
     # List things to save
     save = lambda ep, model, model_path, error, optimizer, scheduler: torch.save({
@@ -89,7 +89,7 @@ if __name__=='__main__':
 #            for param_group in optimizer.param_groups:
 #                print('Learning rate ', param_group['lr'])
         
-            net.train()
+            model.train()
 
             tq = tqdm.tqdm(total=(len(train_loader) * batch_size))
             tq.set_description('Epoch {}, lr {}'.format(e, lr))
@@ -97,7 +97,7 @@ if __name__=='__main__':
 
             for i, (input_data, label_data) in enumerate(train_loader):
                 input_data, label_data = input_data.to(device), label_data.to(device)
-                pred  = net(input_data)
+                pred  = model(input_data)
                 loss = loss_fn(pred, label_data)
                 epoch_loss += loss.item()
 
@@ -114,10 +114,10 @@ if __name__=='__main__':
                 all_val_loss = []
                 counter=  0
                 with torch.no_grad():
-                    net.eval()
+                    model.eval()
                     for j, (input_data, label_data) in enumerate(val_loader):
                         input_data, label_data = input_data.to(device), label_data.to(device)
-                        pred = net(input_data)
+                        pred = model(input_data)
                         val_loss = loss_fn(pred, label_data)
                         all_val_loss.append(loss.item())
                             
@@ -127,7 +127,7 @@ if __name__=='__main__':
 
                 best_mean_rec_loss = mean_loss
                 model_path = model_root / "model_{}.pt".format(e)
-                save(e, net, model_path, best_mean_rec_loss, optimizer, scheduler)
+                save(e, model, model_path, best_mean_rec_loss, optimizer, scheduler)
             
             tq.close()
 
