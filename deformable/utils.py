@@ -14,6 +14,7 @@ def init_net(net, type="kaiming", mode="fan_in", activation_mode="relu", distrib
 def kaiming_weight_zero_bias(model, mode="fan_in", activation_mode="relu", distribution="uniform"):
     for module in model.modules():
         if hasattr(module, 'weight'):
+            print(module.weight)
             if not ('BatchNorm' in module.__class__.__name__):
                 if distribution == "uniform":
                     nn.init.kaiming_uniform_(module.weight, mode=mode, nonlinearity=activation_mode)

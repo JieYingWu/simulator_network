@@ -1,11 +1,12 @@
 import tqdm
 import utils
+import pymesh
 import numpy as np
 from pathlib import Path
 from dataset import SimulatorDataset3D
 
-from unet3d.loss import MeshLoss
-from unet3d.model import UNet3D
+from model import UNet3D
+from loss import MeshLoss
 
 import torch
 import torch.optim as optim
@@ -18,8 +19,16 @@ if __name__ == '__main__':
 
     device = torch.device("cuda")
     root = Path("../checkpoints")
-    train_path = ''
-    val_path = ''
+    num_workers = 6
+
+    mesh_path = '../../sofa/meshes/SimpleBeamTetra_ver2.msh'
+    train_kinematics_path = '../../dataset/2019-08-14-GelPhantom1/dvrk/data0_robot_cartesian_processed_interpolated.csv'
+    train_simulator_path = '../../dataset/2019-08-14-GelPhantom1/simulator/data0/'
+    train_label_path = '../../dataset/2019-08-14-GelPhantom1/camera/data0/'
+
+    val_kinematics_path = '../../dataset/2019-08-14-GelPhantom1/dvrk/data1_robot_cartesian_processed_interpolated.csv'
+    val_simulator_path = '../../dataset/2019-08-14-GelPhantom1/simulator/data1/'
+    val_label_path = '../../dataset/2019-08-14-GelPhantom1/camera/data1/'
 
     epoch_to_use = 44
     use_previous_model = False
@@ -27,16 +36,29 @@ if __name__ == '__main__':
     
     in_channels = 3
     out_channels = 3
-    final_sigmoid = True
+    final_sigmoid = False
     batch_size = 8
     lr = 5.0e-4
     n_epochs = 500
     momentum=0.9
     img_size = [13, 5, 5]
+    point_scale = torch.tensor([1, 1, 1]).float()
+
+    train_dataset = SimulatorDataset3D(train_kinematics_path, train_simulator_path, train_label_path)
+    val_dataset = SimulatorDataset3D(val_kinematics_path, val_simulator_path, val_label_path)
+    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     
-    model = UNet3D(in_channels, out_channels, final_sigmoid).to(device)
-    summary(model, input_size=(3, img_size[0], img_size[1], img_size[2]))
-    loss_fn = MeshLoss()
+    model = UNet3D(in_channels=in_channels, out_channels=out_channels).to(device)
+#    model = utils.init_net(model)
+#    summary(model, input_size=(3, img_size[0], img_size[1], img_size[2]))
+
+    #try:
+    mesh = pymesh.load_mesh(mesh_path)
+    #except:
+    #    print('Please include at least one mesh (0.stl) in the training directory')
+        
+    loss_fn = MeshLoss(point_scale, mesh, batch_size, device)
     optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum) 
     scheduler = ReduceLROnPlateau(optimizer)
 
@@ -71,7 +93,6 @@ if __name__ == '__main__':
         epoch = 1
         step = 0
         best_mean_error = 0.0
-        model = utils.init_net(model)
         
     save = lambda ep, model, model_path, error, optimizer, scheduler: torch.save({
         'model': model.state_dict(),
@@ -93,14 +114,17 @@ if __name__ == '__main__':
             tq.set_description('Epoch {}, lr {}'.format(e, lr))
             epoch_loss = 0
 
-            for i, (input_data, label_data) in enumerate(train_loader):
-                input_data, label_data = input_data.to(device), label_data.to(device)
-                pred  = model(input_data)
-                loss = loss_fn(pred, label_data)
+            for i, (kinematics, mesh, label) in enumerate(train_loader):
+                kinematics, mesh, label = kinematics.to(device), mesh.to(device), label
+                pred  = model(kinematics, mesh)
+                print('done prediction')
+                loss = loss_fn(pred, label)
+                print('calculated loss')
                 epoch_loss += loss.item()
 
                 optimizer.zero_grad()
                 loss.backward()
+                print('finished backprop')
                 optimizer.step()
                 mean_loss = np.mean(loss.item())
                 tq.update(batch_size)
@@ -113,9 +137,9 @@ if __name__ == '__main__':
                 counter=  0
                 with torch.no_grad():
                     model.eval()
-                    for j, (input_data, label_data) in enumerate(val_loader):
-                        input_data, label_data = input_data.to(device), label_data.to(device)
-                        pred = model(input_data)
+                    for j, (kinematics, mesh, label) in enumerate(val_loader):
+                        kinematics, mesh, label = kinematics.to(device), mesh.to(device), label
+                        pred = model(kinematics, mesh)
                         val_loss = loss_fn(pred, label_data)
                         all_val_loss.append(loss.item())
                             

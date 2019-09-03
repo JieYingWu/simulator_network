@@ -5,6 +5,7 @@ import numpy as np
 from torch import nn
 from torch import optim
 from pathlib import Path
+from loss import RigidLoss
 from network import SpringNetwork
 from dataset import SimulatorDataset
 from torch.utils.data import DataLoader
@@ -14,8 +15,8 @@ if __name__=='__main__':
     # Set some parameters
     device = torch.device('cuda')
     root = Path('checkpoints')
-    train_path = '../dataset/test/data_long'
-    val_path = '../dataset/test/data1'
+    train_path = '../../dataset/test/data_long'
+    val_path = '../../dataset/test/data1'
     lr = 1e-10
     momentum = 0.9
     batch_size = 8
@@ -25,6 +26,7 @@ if __name__=='__main__':
     # Input info: 7 coordinates of the tabletoe = 7 + 7 pos from dVRK
     input_size = 14
     output_size = 7
+    loss_weight = 10
     
     train_dataset = SimulatorDataset(kinematics_file=train_path+'_cartesian_processed.csv', simulator_file=train_path+'_cartesian_simulation.csv', label_file=train_path+'_polaris_processed.csv')
     val_dataset = SimulatorDataset(kinematics_file=val_path+'_cartesian_processed.csv', simulator_file=val_path+'_cartesian_simulation.csv', label_file=val_path+'_polaris_processed.csv')
@@ -36,7 +38,7 @@ if __name__=='__main__':
     epoch_to_use = 0
 
     model = SpringNetwork(input_size=input_size, output_size=output_size)
-    loss_fn = nn.MSELoss()
+    loss_fn = RigidLoss(loss_weight)
     optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer)
 
