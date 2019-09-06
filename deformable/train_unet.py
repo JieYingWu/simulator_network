@@ -6,7 +6,7 @@ from pathlib import Path
 from dataset import SimulatorDataset3D
 
 from model import UNet3D
-from loss import MeshLoss
+#from loss import MeshLoss, ChamferLoss
 
 import torch
 import torch.optim as optim
@@ -14,21 +14,23 @@ from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torchsummary import summary
 
+from chamfer_distance.chamfer_distance import ChamferDistance
+
 
 if __name__ == '__main__':
 
     device = torch.device("cuda")
     root = Path("../checkpoints")
-    num_workers = 6
+    num_workers = 1
 
     mesh_path = '../../sofa/meshes/SimpleBeamTetra_ver2.msh'
-    train_kinematics_path = '../../dataset/2019-08-14-GelPhantom1/dvrk/data0_robot_cartesian_processed_interpolated.csv'
-    train_simulator_path = '../../dataset/2019-08-14-GelPhantom1/simulator/data0/'
-    train_label_path = '../../dataset/2019-08-14-GelPhantom1/camera/data0/'
+    train_kinematics_path = ['../../dataset/2019-08-14-GelPhantom1/dvrk/data0_robot_cartesian_processed_interpolated.csv', '../../dataset/2019-08-14-GelPhantom1/dvrk/data8_robot_cartesian_processed_interpolated.csv']
+    train_simulator_path = ['../../dataset/2019-08-14-GelPhantom1/simulator/data0/', '../../dataset/2019-08-14-GelPhantom1/simulator/data8/']
+    train_label_path = ['../../dataset/2019-08-14-GelPhantom1/camera/data0_filtered/','../../dataset/2019-08-14-GelPhantom1/camera/data0_filtered/']
 
-    val_kinematics_path = '../../dataset/2019-08-14-GelPhantom1/dvrk/data1_robot_cartesian_processed_interpolated.csv'
-    val_simulator_path = '../../dataset/2019-08-14-GelPhantom1/simulator/data1/'
-    val_label_path = '../../dataset/2019-08-14-GelPhantom1/camera/data1/'
+    val_kinematics_path = ['../../dataset/2019-08-14-GelPhantom1/dvrk/data1_robot_cartesian_processed_interpolated.csv']
+    val_simulator_path = ['../../dataset/2019-08-14-GelPhantom1/simulator/data1/']
+    val_label_path = ['../../dataset/2019-08-14-GelPhantom1/camera/data1/']
 
     epoch_to_use = 44
     use_previous_model = False
@@ -37,7 +39,7 @@ if __name__ == '__main__':
     in_channels = 3
     out_channels = 3
     final_sigmoid = False
-    batch_size = 8
+    batch_size = 2
     lr = 5.0e-4
     n_epochs = 500
     momentum=0.9
@@ -54,11 +56,12 @@ if __name__ == '__main__':
 #    summary(model, input_size=(3, img_size[0], img_size[1], img_size[2]))
 
     #try:
-    mesh = pymesh.load_mesh(mesh_path)
+    #    mesh = pymesh.load_mesh(mesh_path)
     #except:
     #    print('Please include at least one mesh (0.stl) in the training directory')
         
-    loss_fn = MeshLoss(point_scale, mesh, batch_size, device)
+    # loss_fn = MeshLoss(point_scale, mesh, batch_size, device)
+    loss_fn = ChamferDistance()
     optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum) 
     scheduler = ReduceLROnPlateau(optimizer)
 
@@ -117,14 +120,18 @@ if __name__ == '__main__':
             for i, (kinematics, mesh, label) in enumerate(train_loader):
                 kinematics, mesh, label = kinematics.to(device), mesh.to(device), label
                 pred  = model(kinematics, mesh)
-                print('done prediction')
-                loss = loss_fn(pred, label)
-                print('calculated loss')
+                pred_subset = torch.cat((pred[:,:,0,:,:].reshape(batch_size, 3, -1),
+                                         pred[:,:,-1,:,:].reshape(batch_size, 3, -1),
+                                         pred[:,:,1:img_size[0]-1,0,:].reshape(batch_size, 3, -1),
+                                         pred[:,:,1:img_size[0]-1,-1,:].reshape(batch_size, 3, -1),
+                                         pred[:,:,1:img_size[0],1:img_size[1],0].reshape(batch_size, 3, -1),
+                                         pred[:,:,1:img_size[0],1:img_size[1],-1].reshape(batch_size, 3, -1)), axis=2)
+                dist1, dist2 = loss_fn(pred_subset.cpu(), label.cpu())
+                loss = (torch.mean(dist1)) + (torch.mean(dist2))
                 epoch_loss += loss.item()
 
                 optimizer.zero_grad()
                 loss.backward()
-                print('finished backprop')
                 optimizer.step()
                 mean_loss = np.mean(loss.item())
                 tq.update(batch_size)
