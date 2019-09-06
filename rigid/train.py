@@ -15,8 +15,8 @@ if __name__=='__main__':
     # Set some parameters
     device = torch.device('cuda')
     root = Path('checkpoints')
-    train_path = '../../dataset/test/data_long'
-    val_path = '../../dataset/test/data1'
+    train_path = ['../../dataset/2019-08-08-Lego/data0', '../../dataset/2019-08-08-Lego/data1', '../../dataset/2019-08-08-Lego/data2', '../../dataset/2019-08-08-Lego/data3', '../../dataset/2019-08-08-Lego/data_long']
+    val_path = ['../../dataset/2019-08-08-Lego/data4']
     lr = 1e-10
     momentum = 0.9
     batch_size = 8
@@ -28,8 +28,8 @@ if __name__=='__main__':
     output_size = 7
     loss_weight = 10
     
-    train_dataset = SimulatorDataset(kinematics_file=train_path+'_cartesian_processed.csv', simulator_file=train_path+'_cartesian_simulation.csv', label_file=train_path+'_polaris_processed.csv')
-    val_dataset = SimulatorDataset(kinematics_file=val_path+'_cartesian_processed.csv', simulator_file=val_path+'_cartesian_simulation.csv', label_file=val_path+'_polaris_processed.csv')
+    train_dataset = SimulatorDataset(train_path)
+    val_dataset = SimulatorDataset(val_path)
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     

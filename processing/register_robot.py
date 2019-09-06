@@ -9,10 +9,10 @@ from scipy.spatial.transform import Rotation as R
 
 scale = 1000
 # Height is adjusted since we poke into
-height_scale = 0.5
+height_scale = 20
 
 ##### For 2019-08-08-Lego ####
-phantom_points = np.array([[31.8,96.05,0], [15.9,96.05,-31.8], [-31.8,96.05,-15.9], [-31.8,96.05,31.8]])
+phantom_points = np.array([[31.8,96.05+height_scale,0], [15.9,96.05+height_scale,-31.8], [-31.8,96.05+height_scale,-15.9], [-31.8,96.05+height_scale,31.8]])
 
 # Currently manually read out from file
 measured_points = np.array([[-0.00282601136754,-0.0062888038662,-0.0932844615085],[0.0236521042868,0.0105876960433,-0.0935333671393],[0.00579400872003,0.0526017481315,-0.093906899099],[-0.0362004390969,0.0487251420195,-0.0957448310665]])*scale
