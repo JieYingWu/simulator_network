@@ -1,11 +1,11 @@
 import os
 import torch
-import pymesh
+import plyfile
 import numpy as np
 from torch.utils.data import Dataset
 
 shape = (3, 13, 5, 5)
-pc_length = 15200
+pc_length = 16000
 
 class SimulatorDataset3D(Dataset):
     def __init__(self, kinematics_path, simulator_path, label_path):
@@ -30,10 +30,11 @@ class SimulatorDataset3D(Dataset):
 #        print(self.kinematics_array.shape[0], len(self.simulator_array), len(self.label_array))
         return len(self.simulator_array)
 
-    # return robot kinematics, pymesh mesh, and point cloud
+    # return robot kinematics, mesh, and point cloud
     def __getitem__(self, idx):
         simulation = np.genfromtxt(self.simulator_array[idx])
-        pc = pymesh.load_mesh(self.label_array[idx]).vertices
+        pc = plyfile.PlyData.read(self.label_array[idx])['vertex']
+        pc = np.concatenate((np.expand_dims(pc['x'], 1), np.expand_dims(pc['y'],1), np.expand_dims(pc['z'],1)), 1)
         pc = self._pad(pc)
         pc = np.transpose(pc, (1,0))
         return torch.from_numpy(self.kinematics_array[idx,1:]).float(), torch.from_numpy(self._reshape(simulation)).float(), torch.from_numpy(pc).float()

@@ -62,15 +62,15 @@ while(len(os.listdir(name)) < args.num_frames):
 
         # Create a config object
         config = rs.config()
+        
         # Tell config that we will use a recorded device from file to be used by the pipeline through playback.
         rs.config.enable_device_from_file(config, args.input)
         # Configure the pipeline to stream the depth stream
-        config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 60)
+        config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
 
         #Start streaming with default recommended configuration
         pipe.start(config)
         threads = list()
-    
         for t in range(args.num_frames):
             # Wait for the next set of frames from the camera
             frames = pipe.wait_for_frames()

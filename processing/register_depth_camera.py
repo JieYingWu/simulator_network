@@ -5,6 +5,7 @@ import pcl
 from pcl import IterativeClosestPoint
 
 source = pcl.load(sys.argv[1])
+source = pcl.PointCloud(source.to_array()*1000)
 target = pcl.load(sys.argv[2])
 
 icp = source.make_IterativeClosestPoint()

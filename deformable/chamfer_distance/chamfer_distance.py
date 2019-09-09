@@ -29,7 +29,6 @@ class ChamferDistanceFunction(torch.autograd.Function):
             cd.forward_cuda(xyz1, xyz2, dist1, dist2, idx1, idx2)
 
         ctx.save_for_backward(xyz1, xyz2, idx1, idx2)
-
         return dist1, dist2
 
     @staticmethod

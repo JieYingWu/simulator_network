@@ -9,17 +9,25 @@ from scipy.spatial.transform import Rotation as R
 
 scale = 1000
 # Height is adjusted since we poke into
-height_scale = 20
+height_scale = 2
 
 ##### For 2019-08-08-Lego ####
-phantom_points = np.array([[31.8,96.05+height_scale,0], [15.9,96.05+height_scale,-31.8], [-31.8,96.05+height_scale,-15.9], [-31.8,96.05+height_scale,31.8]])
+#phantom_points = np.array([[31.8,96.05+height_scale,0], [15.9,96.05+height_scale,-31.8], [-31.8,96.05+height_scale,-15.9], [-31.8,96.05+height_scale,31.8]])
 
 # Currently manually read out from file
-measured_points = np.array([[-0.00282601136754,-0.0062888038662,-0.0932844615085],[0.0236521042868,0.0105876960433,-0.0935333671393],[0.00579400872003,0.0526017481315,-0.093906899099],[-0.0362004390969,0.0487251420195,-0.0957448310665]])*scale
+#measured_points = np.array([[-0.00282601136754,-0.0062888038662,-0.0932844615085],[0.0236521042868,0.0105876960433,-0.0935333671393],[0.00579400872003,0.0526017481315,-0.093906899099],[-0.0362004390969,0.0487251420195,-0.0957448310665]])*scale
 
 #### For 2019-08-14-GelPhantom1 ####
 #phantom_points = np.array([[34.35,17.9+height_scale,-19.65], [-34.35,17.9+height_scale,-19.65], [-34.35,17.9+height_scale,19.65], [34.35,17.9+height_scale,19.65]])
 #measured_points = np.array([[-0.0796385679491,0.0143042152692,-0.166926943272],[-0.027116819443,0.0448946184372,-0.16551352955],[-0.0426067612174,0.0737392043797,-0.164060336369],[-0.0952109779515,0.0467586154014,-0.161902662597]])*scale
+
+#### For 2019-09-07-GelPhantom1 calibration.bag####
+#phantom_points = np.array([[34.35,17.9+height_scale,-19.65],[34.35,17.9+height_scale,19.65], [-34.35,17.9+height_scale,19.65], [-34.35,17.9+height_scale,-19.65]])
+#measured_points = np.array([[-0.0385508264048,0.0117059655192,-0.163761123466],[-0.0675615150341,0.0271352462875,-0.162144016254],[-0.0325210577463,0.077589122308,-0.163133003789],[-0.006050161735,0.0581002839305,-0.163235763297]])*scale
+
+#### For 2019-09-07-GelPhantom1 calibration2.bag####
+phantom_points = np.array([[34.35,17.9+height_scale,-19.65],[34.35,17.9+height_scale,19.65], [-34.35,17.9+height_scale,19.65], [-34.35,17.9+height_scale,-19.65]])
+measured_points = np.array([[0.0109767365717,0.0325840775784,-0.170454264724],[-0.0185004046648,0.0223525773209,-0.168647028127],[-0.0364133953944,0.0777076526436,-0.162404311456],[-0.00742976914855,0.0867336555288,-0.165045580182]])*scale
 
 # Registers measured_points to phantom_points
 transform = cisstNumericalPython.nmrRegistrationRigid(measured_points, phantom_points)
