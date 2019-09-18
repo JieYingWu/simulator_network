@@ -4,6 +4,11 @@ import numpy as np
 import pcl
 from pcl import IterativeClosestPoint
 
+transform = np.array([[1.0, 0.0, 0.0, 0.0],
+                      [0.0, -0.5984601, -0.8011526, 0.0],
+                      [0.0, -0.8011526, -0.5984601, 0.0],
+                      [0.0, 0.0,  0.0,  1.0]])
+
 source = pcl.load(sys.argv[1])
 source = pcl.PointCloud(source.to_array()*1000)
 target = pcl.load(sys.argv[2])

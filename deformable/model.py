@@ -1,4 +1,4 @@
-#from https://github.com/cosmic-cortex/pytorch-UNet
+#modified from https://github.com/cosmic-cortex/pytorch-UNet
 
 import torch
 import torch.nn as nn
@@ -32,7 +32,7 @@ class UNet3D(nn.Module):
         for enc_layer in self.encoder_layers:
             x_enc.append(enc_layer(x_enc[-1]))
 
-        x_dec = [self.center(x_enc[-1])]
+        x_dec = [self.center(x_enc[-1], kinematics)]
         for dec_layer_idx, dec_layer in enumerate(self.decoder_layers):
             x_opposite = x_enc[-1-dec_layer_idx]
             x_cat = torch.cat(
@@ -118,25 +118,33 @@ class Center3D(nn.Module):
     def __init__(self, in_channels, middle_channels, out_channels, deconv_channels, dropout=False):
         super(Center3D, self).__init__()
 
-        layers = [
+        layers1 = [
             nn.MaxPool3d(kernel_size=2),
             nn.Conv3d(in_channels, middle_channels, kernel_size=3, padding=1),
             nn.BatchNorm3d(middle_channels),
             nn.ReLU(inplace=True),
             nn.Conv3d(middle_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm3d(out_channels),
+        ]
+        layers2 = [
+            nn.BatchNorm3d(out_channels+7),
             nn.ReLU(inplace=True),
-            nn.ConvTranspose3d(out_channels, deconv_channels, kernel_size=2, stride=2)
+            nn.ConvTranspose3d(out_channels+7, deconv_channels, kernel_size=2, stride=2)
         ]
 
         if dropout:
             assert 0 <= dropout <= 1, 'dropout must be between 0 and 1'
             layers.append(nn.Dropout3d(p=dropout))
 
-        self.center = nn.Sequential(*layers)
-
-    def forward(self, x):
-        return self.center(x)
+        self.center1 = nn.Sequential(*layers1)
+        self.center2 = nn.Sequential(*layers2)
+        
+    def forward(self, x, kinematics):
+        x = self.center1(x)
+        kinematics = kinematics.view(kinematics.size()[0], kinematics.size()[1],1,1,1)
+        kinematics = kinematics.repeat(1,1,x.size()[2],x.size()[3],x.size()[4])
+        x = torch.cat((x, kinematics), axis=1)
+        x = self.center2(x)
+        return x 
 
 
 class Decoder3D(nn.Module):
@@ -175,7 +183,8 @@ class Last3D(nn.Module):
             nn.BatchNorm3d(middle_channels),
             nn.ReLU(inplace=True),
             nn.Conv3d(middle_channels, out_channels, kernel_size=1),
-            nn.Softmax(dim=1)
+            nn.Sigmoid()
+#            nn.Softmax(dim=1)
         ]
 
         self.first = nn.Sequential(*layers)

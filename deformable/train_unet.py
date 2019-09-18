@@ -5,7 +5,7 @@ from pathlib import Path
 from dataset import SimulatorDataset3D
 
 from model import UNet3D
-#from loss import MeshLoss, ChamferLoss
+from loss import MeshLoss
 
 import torch
 import torch.optim as optim
@@ -13,41 +13,47 @@ from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torchsummary import summary
 
-from chamfer_distance.chamfer_distance import ChamferDistance
-
-
 if __name__ == '__main__':
 
     device = torch.device("cuda")
     root = Path("checkpoints")
-    num_workers = 6
-
-    mesh_path = '../../sofa/meshes/SimpleBeamTetra_ver2.msh'
+    num_workers = 4
+    train_set = ['data1', 'data2', 'data3', 'data4', 'data5', 'data6', 'data7', 'data8']
+    val_set = ['data0']
+    
     path = '../../dataset/2019-09-07-GelPhantom1'
-    train_kinematics_path = [path+'/dvrk/data0_robot_cartesian_processed_interpolated.csv']#, path+'/dvrk/data2_robot_cartesian_processed_interpolated.csv']
-    train_simulator_path = [path+'/simulator/data0/']#, path+'/simulator/data2/']
-    train_label_path = [path+'/camera/data0_filtered/']#,path+'/camera/data2_filtered/']
+    train_kinematics_path = []
+    train_simulator_path = []
+    train_label_path = []
+    for v in train_set:
+        train_kinematics_path = train_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_processed_interpolated.csv']
+        train_simulator_path = train_simulator_path + [path+'/simulator/' + v + '/']
+        train_label_path = train_label_path + [path+'/camera/' + v + '_filtered/']
 
-    val_kinematics_path = [path+'/dvrk/data1_robot_cartesian_processed_interpolated.csv']
-    val_simulator_path = [path+'/simulator/data1/']
-    val_label_path = [path+'/camera/data1_filtered/']
+    print(train_kinematics_path)
+    val_kinematics_path = []
+    val_simulator_path = []
+    val_label_path = []
+    for v in val_set:
+        val_kinematics_path = val_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_processed_interpolated.csv']
+        val_simulator_path = val_simulator_path + [path+'/simulator/' + v + '/']
+        val_label_path = val_label_path + [path+'/camera/' + v + '_filtered/']
 
-    epoch_to_use = 7
+    epoch_to_use = 75
     use_previous_model = False
-    validate_each = 5
+    validate_each = 1
     
     in_channels = 3
     out_channels = 3
     final_sigmoid = False
     batch_size = 32
-    lr = 5.0e-8
+    lr = 1.0e-5
     n_epochs = 500
     momentum=0.9
-    img_size = [13, 5, 5]
-    point_scale = torch.tensor([1, 1, 1]).float()
+    img_size = [3, 25, 9, 9]
 
-    train_dataset = SimulatorDataset3D(train_kinematics_path, train_simulator_path, train_label_path)
-    val_dataset = SimulatorDataset3D(val_kinematics_path, val_simulator_path, val_label_path)
+    train_dataset = SimulatorDataset3D(train_kinematics_path, train_simulator_path, train_label_path, img_size)
+    val_dataset = SimulatorDataset3D(val_kinematics_path, val_simulator_path, val_label_path, img_size)
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     
@@ -55,7 +61,7 @@ if __name__ == '__main__':
 #    model = utils.init_net(model)
 #    summary(model, input_size=(3, img_size[0], img_size[1], img_size[2]))
 
-    loss_fn = ChamferDistance()
+    loss_fn = MeshLoss(70, 0.5, batch_size, device)
     optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum) 
     scheduler = ReduceLROnPlateau(optimizer)
 
@@ -114,14 +120,15 @@ if __name__ == '__main__':
             for i, (kinematics, mesh, label) in enumerate(train_loader):
                 kinematics, mesh, label = kinematics.to(device), mesh.to(device), label
                 pred = model(kinematics, mesh)
-                pred_subset = torch.cat((pred[:,:,0,:,:].reshape(pred.size()[0], 3, -1),
-                                         pred[:,:,-1,:,:].reshape(pred.size()[0], 3, -1),
-                                         pred[:,:,1:img_size[0]-1,0,:].reshape(pred.size()[0], 3, -1),
-                                         pred[:,:,1:img_size[0]-1,-1,:].reshape(pred.size()[0], 3, -1),
-                                         pred[:,:,1:img_size[0],1:img_size[1],0].reshape(pred.size()[0], 3, -1),
-                                         pred[:,:,1:img_size[0],1:img_size[1],-1].reshape(pred.size()[0], 3, -1)), axis=2)
-                dist1, dist2 = loss_fn(pred_subset.cpu(), label.cpu())
-                loss = (torch.mean(dist1)) + (torch.mean(dist2))
+#                print(mesh[0,:,0,0,0])
+#                print(pred[0,:,0,0,0])
+#                pred_subset = torch.cat((pred[:,:,0,:,:].reshape(pred.size()[0], 3, -1),
+#                                         pred[:,:,-1,:,:].reshape(pred.size()[0], 3, -1),
+#                                         pred[:,:,1:img_size[0]-1,0,:].reshape(pred.size()[0], 3, -1),
+#                                         pred[:,:,1:img_size[0]-1,-1,:].reshape(pred.size()[0], 3, -1),
+#                                         pred[:,:,1:img_size[0],1:img_size[1],0].reshape(pred.size()[0], 3, -1),
+#                                         pred[:,:,1:img_size[0],1:img_size[1],-1].reshape(pred.size()[0], 3, -1)), axis=2)
+                loss = loss_fn(pred, label)
                 epoch_loss += loss.item()
 
                 optimizer.zero_grad()
@@ -140,16 +147,24 @@ if __name__ == '__main__':
                     for j, (kinematics, mesh, label) in enumerate(val_loader):
                         kinematics, mesh, label = kinematics.to(device), mesh.to(device), label
                         pred = model(kinematics, mesh)
-                        pred_subset = torch.cat((pred[:,:,0,:,:].reshape(pred.size()[0], 3, -1),
-                                         pred[:,:,-1,:,:].reshape(pred.size()[0], 3, -1),
-                                         pred[:,:,1:img_size[0]-1,0,:].reshape(pred.size()[0], 3, -1),
-                                         pred[:,:,1:img_size[0]-1,-1,:].reshape(pred.size()[0], 3, -1),
-                                         pred[:,:,1:img_size[0],1:img_size[1],0].reshape(pred.size()[0], 3, -1),
-                                         pred[:,:,1:img_size[0],1:img_size[1],-1].reshape(pred.size()[0], 3, -1)), axis=2)
-                        dist1, dist2 = loss_fn(pred_subset.cpu(), label.cpu())
-                        val_loss = (torch.mean(dist1)) + (torch.mean(dist2))
+ #                       pred_subset = torch.cat((pred[:,:,0,:,:].reshape(pred.size()[0], 3, -1)
+                        #                  pred[:,:,-1,:,:].reshape(pred.size()[0], 3, -1),
+                        #                  pred[:,:,1:img_size[0]-1,0,:].reshape(pred.size()[0], 3, -1),
+                        #                  pred[:,:,1:img_size[0]-1,-1,:].reshape(pred.size()[0], 3, -1),
+                        #                  pred[:,:,1:img_size[0],1:img_size[1],0].reshape(pred.size()[0], 3, -1),
+                        #                  pred[:,:,1:img_size[0],1:img_size[1],-1].reshape(pred.size()[0], 3, -1)), axis=2)
+                        loss = loss_fn(pred, label)
                         all_val_loss.append(loss.item())
-                            
+
+                        if (j == 0):
+                            mesh_plot = mesh.detach().cpu().numpy()
+                            pred_plot = pred.detach().cpu().numpy()
+                            label_plot = label.detach().cpu().numpy()
+                            np.save(str(results_root/'prediction_{e}'.format(e=e)), pred_plot)
+                            np.save(str(results_root/'mesh_{e}'.format(e=e)), mesh_plot)
+                            np.save(str(results_root/'label_{e}'.format(e=e)), label_plot)
+
+                        
                 mean_loss = np.mean(all_val_loss)
                 tq.set_postfix(loss='validation loss={:5f}'.format(mean_loss))
                 scheduler.step(mean_loss)
