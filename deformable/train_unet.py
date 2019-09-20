@@ -18,8 +18,8 @@ if __name__ == '__main__':
     device = torch.device("cuda")
     root = Path("checkpoints")
     num_workers = 4
-    train_set = ['data1', 'data2', 'data3', 'data4', 'data5', 'data6', 'data7', 'data8']
-    val_set = ['data0']
+    train_set = ['data2', 'data3', 'data4', 'data5', 'data6', 'data7', 'data8', 'data9']
+    val_set = ['data0', 'data1']
     
     path = '../../dataset/2019-09-07-GelPhantom1'
     train_kinematics_path = []
