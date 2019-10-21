@@ -2,10 +2,10 @@ import tqdm
 import utils
 import numpy as np
 from pathlib import Path
-from dataset import SimulatorDataset3D
+from dataset import SimulatorDataset2D
 
-from model import UNet3D
-from loss import MeshLoss
+from model2d import UNet
+from loss import MeshLoss2D
 
 import torch
 import torch.optim as optim
@@ -17,17 +17,17 @@ if __name__ == '__main__':
 
     device = torch.device("cuda")
     root = Path("checkpoints")
-    num_workers = 2
-    train_set = ['data1', 'data2', 'data3', 'data4', 'data5', 'data6', 'data7', 'data8']#, 'data9']
-    val_set = ['data0']
+    num_workers = 4
+    train_set = ['data2', 'data3', 'data4', 'data5', 'data6', 'data7', 'data8', 'data9']
+    val_set = ['data0', 'data1']
     
-    path = '../../dataset/2019-10-09-GelPhantom1'
+    path = '../../dataset/2019-09-07-GelPhantom1'
     train_kinematics_path = []
     train_simulator_path = []
     train_label_path = []
     for v in train_set:
         train_kinematics_path = train_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_processed_interpolated.csv']
-        train_simulator_path = train_simulator_path + [path+'/simulator/' + v + '/']
+        train_simulator_path = train_simulator_path + [path+'/simulator/steps40/' + v + '/']
         train_label_path = train_label_path + [path+'/camera/' + v + '_filtered/']
 
     print(train_kinematics_path)
@@ -36,7 +36,7 @@ if __name__ == '__main__':
     val_label_path = []
     for v in val_set:
         val_kinematics_path = val_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_processed_interpolated.csv']
-        val_simulator_path = val_simulator_path + [path+'/simulator/' + v + '/']
+        val_simulator_path = val_simulator_path + [path+'/simulator/steps40/' + v + '/']
         val_label_path = val_label_path + [path+'/camera/' + v + '_filtered/']
 
     epoch_to_use = 1
@@ -45,33 +45,33 @@ if __name__ == '__main__':
     
     in_channels = 3
     out_channels = 3
-    batch_size = 128
+    batch_size = 32
     lr = 1.0e-6
     n_epochs = 500
     momentum=0.9
-    img_size = [3, 25, 9, 9]
+    img_size = [3, 25, 9]
 
-    train_dataset = SimulatorDataset3D(train_kinematics_path, train_simulator_path, train_label_path, img_size)
-    val_dataset = SimulatorDataset3D(val_kinematics_path, val_simulator_path, val_label_path, img_size)
+    train_dataset = SimulatorDataset2D(train_kinematics_path, train_simulator_path, train_label_path, img_size)
+    val_dataset = SimulatorDataset2D(val_kinematics_path, val_simulator_path, val_label_path, img_size)
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     
-    model = UNet3D(in_channels=in_channels, out_channels=out_channels).to(device)
+    model = UNet(in_channels=in_channels, out_channels=out_channels).to(device)
 #    model = utils.init_net(model)
 #    summary(model, input_size=(3, img_size[0], img_size[1], img_size[2]))
 
-    loss_fn = MeshLoss(70, 0.5, batch_size, device)
+    loss_fn = MeshLoss2D(70, 0.5, batch_size, device)
     optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum) 
     scheduler = ReduceLROnPlateau(optimizer)
 
     try:
-        model_root = root / "models"
+        model_root = root / "models2d"
         model_root.mkdir(mode=0o777, parents=False)
     except OSError:
         print("path exists")
 
     try:
-        results_root = root / "results"
+        results_root = root / "results2d"
         results_root.mkdir(mode=0o777, parents=False)
     except OSError:
         print("path exists")
@@ -119,7 +119,7 @@ if __name__ == '__main__':
             for i, (kinematics, mesh, label) in enumerate(train_loader):
                 kinematics, mesh, label = kinematics.to(device), mesh.to(device), label
                 pred = model(kinematics, mesh)
-                loss = loss_fn(pred, label).to(device)
+                loss = loss_fn(pred, label)
                 epoch_loss += loss.item()
 
                 optimizer.zero_grad()
@@ -141,7 +141,7 @@ if __name__ == '__main__':
                         loss = loss_fn(pred, label)
                         all_val_loss.append(loss.item())
 
-                        if (j == 500):
+                        if (j == 0):
                             mesh_plot = mesh.detach().cpu().numpy()
                             pred_plot = pred.detach().cpu().numpy()
                             label_plot = label.detach().cpu().numpy()

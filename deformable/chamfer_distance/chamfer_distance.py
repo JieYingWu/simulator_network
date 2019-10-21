@@ -5,6 +5,7 @@ from torch.utils.cpp_extension import load
 cd = load(name="cd",
           sources=["chamfer_distance/chamfer_distance.cpp",
                    "chamfer_distance/chamfer_distance.cu"])
+device = torch.device("cuda")
 
 class ChamferDistanceFunction(torch.autograd.Function):
     @staticmethod
@@ -22,7 +23,7 @@ class ChamferDistanceFunction(torch.autograd.Function):
         if not xyz1.is_cuda:
             cd.forward(xyz1, xyz2, dist1, dist2, idx1, idx2)
         else:
-            dist1 = dist1.cuda()
+            dist1 = dist1.to(device)
             dist2 = dist2.cuda()
             idx1 = idx1.cuda()
             idx2 = idx2.cuda()

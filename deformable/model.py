@@ -1,4 +1,4 @@
-#modified from https://github.com/cosmic-cortex/pytorch-UNet
+# modified from https://github.com/cosmic-cortex/pytorch-UNet
 
 import torch
 import torch.nn as nn
@@ -128,7 +128,13 @@ class Center3D(nn.Module):
             nn.Conv3d(middle_channels+7, out_channels+7, kernel_size=3, padding=1),
             nn.BatchNorm3d(out_channels+7),
             nn.ReLU(inplace=True),
-            nn.Conv3d(middle_channels+7, out_channels, kernel_size=3, padding=1),
+            nn.Conv3d(middle_channels+7, out_channels+7, kernel_size=3, padding=1),
+            nn.BatchNorm3d(out_channels+7),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(middle_channels+7, out_channels+3, kernel_size=3, padding=1),
+            nn.BatchNorm3d(out_channels+3),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(middle_channels+3, out_channels, kernel_size=3, padding=1),
             nn.BatchNorm3d(out_channels),
             nn.ReLU(inplace=True),
             nn.ConvTranspose3d(out_channels, deconv_channels, kernel_size=2, stride=2)
