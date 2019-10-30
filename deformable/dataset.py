@@ -5,8 +5,7 @@ import numpy as np
 from torch.utils.data import Dataset
 
 class SimulatorDataset3D(Dataset):
-    def __init__(self, kinematics_path, simulator_path, label_path, shape, pc_length=50000):
-        self.shape = shape
+    def __init__(self, kinematics_path, simulator_path, label_path, pc_length=50000):
         self.pc_length = pc_length
         self.kinematics_array = None
         for path in  kinematics_path:
@@ -38,7 +37,7 @@ class SimulatorDataset3D(Dataset):
         return torch.from_numpy(self.kinematics_array[idx,1:]).float(), torch.from_numpy(self._reshape(simulation)).float(), torch.from_numpy(pc).float()
 
     def _reshape(self, x):
-        y = x.reshape(25, 9, 9, 3)
+        y = x.reshape(13, 5, 5, 3)
         y = y.transpose((3, 0, 1, 2))        
         return y
 
@@ -49,8 +48,7 @@ class SimulatorDataset3D(Dataset):
 
     
 class SimulatorDataset2D(Dataset):
-    def __init__(self, kinematics_path, simulator_path, label_path, shape, pc_length=50000):
-        self.shape = shape
+    def __init__(self, kinematics_path, simulator_path, label_path, pc_length=50000):
         self.pc_length = pc_length
         self.kinematics_array = None
         for path in  kinematics_path:
