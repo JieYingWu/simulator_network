@@ -83,9 +83,11 @@ class outconv(nn.Module):
     def __init__(self, in_ch, out_ch):
         super(outconv, self).__init__()
         self.conv = nn.Conv2d(in_ch, out_ch, 1)
+        self.sigmoid = nn.Sigmoid()
 
     def forward(self, x):
         x = self.conv(x)
+        x = self.sigmoid(x)
         return x
 
     
@@ -97,9 +99,9 @@ class UNet(nn.Module):
         self.inc = inconv(in_channels, 64)
         self.down1 = down(64, 128)
         self.down2 = down(128, 256)
-        self.down3 = down(256, 256)
-        self.up2 = up(512+7, 128)
-        self.up3 = up(256, 64)
+#        self.down3 = down(256, 256)
+        self.up2 = up(512, 128)
+        self.up3 = up(391, 64)
         self.up4 = up(128, 64)
         self.outc = outconv(64, out_channels)
 
@@ -107,14 +109,14 @@ class UNet(nn.Module):
         x1 = self.inc(mesh)
         x2 = self.down1(x1)
         x3 = self.down2(x2)
-        x4 = self.down3(x3)
+#        x4 = self.down3(x3)
         
         kinematics = kinematics.view(kinematics.size()[0], kinematics.size()[1],1,1)
-        kinematics = kinematics.repeat(1,1,x4.size()[2],x4.size()[3])
-        x4 = torch.cat((x4, kinematics), axis=1)
+        kinematics = kinematics.repeat(1,1,x3.size()[2],x3.size()[3])
+        x3 = torch.cat((x3, kinematics), axis=1)
         
-        x = self.up2(x4, x3)
-        x = self.up3(x, x2)
+#        x = self.up2(x4, x3)
+        x = self.up3(x3, x2)
         x = self.up4(x, x1)
         x = self.outc(x)
         return x

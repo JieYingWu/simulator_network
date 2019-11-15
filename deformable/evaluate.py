@@ -5,7 +5,6 @@ import plyfile
 import numpy as np
 from chamfer_distance.chamfer_distance import ChamferDistance
 
-
 def refine_mesh(mesh, factor):
     x,y,z =  mesh.size()
     new_x = (x-1)*factor+1
@@ -35,8 +34,6 @@ def refine_mesh(mesh, factor):
 
     return fine_mesh
 
-
-
 old_naming = False
 mesh_path = sys.argv[1]
 gt_path = sys.argv[2]
@@ -61,10 +58,11 @@ for i in range(len(mesh_files)):
         print("Can't find ", mesh_files[i])
         exit()
 #    mesh = mesh[grid_order]
+#    mesh = mesh.reshape(25, 9, 9, 3)
     mesh = mesh.reshape(13, 5, 5, 3)
     mesh = mesh[:,-1,:,:]
 #    print(mesh[:,:,0])
-#    mesh = refine_mesh(mesh, 3)
+    mesh = refine_mesh(mesh, 3)
 #    print(mesh[:,:,0])
     mesh = mesh.reshape(-1,3).unsqueeze(0).float()
 
@@ -74,7 +72,7 @@ for i in range(len(mesh_files)):
         print(i, ' is out of range')
         exit()
     pc = torch.from_numpy(np.concatenate((np.expand_dims(pc['x'], 1), np.expand_dims(pc['y'],1), np.expand_dims(pc['z'],1)), 1)).unsqueeze(0).float()
-    dist1, dist2 = loss_fn(pc, mesh)
-    loss += torch.mean(dist1) #dist[0]
+    dist1, dist2 = loss_fn(mesh, pc)
+    loss += torch.mean(dist2) #dist[0]
 
 print(loss/len(mesh_files))

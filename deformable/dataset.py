@@ -72,22 +72,22 @@ class SimulatorDataset2D(Dataset):
 
     # return robot kinematics, mesh, and point cloud
     def __getitem__(self, idx):
-        simulation_time = time()
+#        simulation_time = time()
         simulation = np.genfromtxt(self.simulator_array[idx])
         simulation = self._reshape(simulation)
-        print('Loading simulation took ' + str(time()-simulations_time) + ' s')
+#        print('Loading simulation took ' + str(time()-simulations_time) + ' s')
 
-        label_time = time()
+#        label_time = time()
         pc = plyfile.PlyData.read(self.label_array[idx])['vertex']
         pc = np.concatenate((np.expand_dims(pc['x'], 1), np.expand_dims(pc['y'],1), np.expand_dims(pc['z'],1)), 1)
         pc = self._pad(pc)
         pc = np.transpose(pc, (1,0))
-        print('Loading label took ' + str(time()-label_time) + ' s')        
+#        print('Loading label took ' + str(time()-label_time) + ' s')        
          
         return torch.from_numpy(self.kinematics_array[idx,1:]).float(), torch.from_numpy(simulation).float(), torch.from_numpy(pc).float()
 
     def _reshape(self, x):
-        y = x.reshape(25, 9, 9, 3)
+        y = x.reshape(13, 5, 5, 3)
         y = y.transpose((3, 0, 1, 2))
         y = y[:,:,-1,:]
         return y

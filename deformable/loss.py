@@ -80,7 +80,8 @@ class MeshLoss2D(nn.Module):
     def forward(self, vertices, pc):
         # get probabilities from logits
         loss = torch.zeros(vertices.size()[0]).to(self.device)
-        top = vertices.reshape(vertices.size()[0],3,-1)
+        fine_mesh = refine_mesh(vertices, 3)
+        top = fine_mesh.reshape(vertices.size()[0],3,-1)
         for i in range(vertices.size()[0]):
             cur_v = top[i]
             cur_v = torch.transpose(cur_v, 0,1).unsqueeze(0)

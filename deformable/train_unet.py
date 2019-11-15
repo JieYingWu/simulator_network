@@ -13,9 +13,13 @@ from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torchsummary import summary
 
+scale = torch.zeros((1,3,1,1,1))
+scale[0,:,0,0,0] = torch.tensor([5.28, 7.16, 7.86])/2
+scale = scale.cuda()
+
 def correct(mesh,x):
     corrected = mesh.clone()
-    x = (x-0.5)*10
+    x = (x-0.5)*scale
     corrected[:,:,:,-1,:] = mesh[:,:,:,-1,:] + x[:,:,:,-1,:]
     return corrected
     
@@ -24,9 +28,9 @@ if __name__ == '__main__':
     device = torch.device("cuda")
     root = Path("checkpoints")
     num_workers = 4
-    train_set = ['data1', 'data2', 'data3', 'data4', 'data6', 'data7', 'data8', 'data9', 'data10']
+    train_set = ['data3', 'data4', 'data5',  'data6', 'data7', 'data8', 'data9', 'data10', 'data11']
     val_set = ['data0']
-    # Testing on data5 and 11
+    # Testing on data1 and 2
     
     path = '../../dataset/2019-10-09-GelPhantom1'
     train_kinematics_path = []
@@ -34,7 +38,7 @@ if __name__ == '__main__':
     train_label_path = []
     for v in train_set:
         train_kinematics_path = train_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_processed_interpolated.csv']
-        train_simulator_path = train_simulator_path + [path+'/simulator/' + v + '/']
+        train_simulator_path = train_simulator_path + [path+'/simulator/1e4_data/' + v + '/']
         train_label_path = train_label_path + [path+'/camera/' + v + '_filtered/']
 
     print(train_kinematics_path)
@@ -43,11 +47,11 @@ if __name__ == '__main__':
     val_label_path = []
     for v in val_set:
         val_kinematics_path = val_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_processed_interpolated.csv']
-        val_simulator_path = val_simulator_path + [path+'/simulator/' + v + '/']
+        val_simulator_path = val_simulator_path + [path+'/simulator/1e4_data/' + v + '/']
         val_label_path = val_label_path + [path+'/camera/' + v + '_filtered/']
 
-    epoch_to_use = 1
-    use_previous_model = False
+    epoch_to_use = 34
+    use_previous_model = True
     validate_each = 1
     
     in_channels = 3
