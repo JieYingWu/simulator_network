@@ -61,7 +61,7 @@ if __name__ == '__main__':
     n_epochs = 500
     momentum=0.9
 
-    train_dataset = SimulatorDataset3D(train_kinematics_path, train_simulator_path, train_label_path)
+    train_dataset = SimulatorDataset3D(train_kinematics_path, train_simulator_path, train_label_path, augment=True)
     val_dataset = SimulatorDataset3D(val_kinematics_path, val_simulator_path, val_label_path)
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)

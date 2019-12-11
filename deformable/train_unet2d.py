@@ -4,7 +4,7 @@ import numpy as np
 from pathlib import Path
 from dataset import SimulatorDataset2D
 
-from model2d import UNet
+from model import UNet2D
 from loss import MeshLoss2D
 
 import torch
@@ -62,12 +62,12 @@ if __name__ == '__main__':
     n_epochs = 500
     momentum=0.9
 
-    train_dataset = SimulatorDataset2D(train_kinematics_path, train_simulator_path, train_label_path)
+    train_dataset = SimulatorDataset2D(train_kinematics_path, train_simulator_path, train_label_path, augment=True)
     val_dataset = SimulatorDataset2D(val_kinematics_path, val_simulator_path, val_label_path)
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     
-    model = UNet(in_channels=in_channels, out_channels=out_channels).to(device)
+    model = UNet2D(in_channels=in_channels, out_channels=out_channels).to(device)
 #    model = utils.init_net(model)
 #    summary(model, input_size=(3, img_size[0], img_size[1], img_size[2]))
 
