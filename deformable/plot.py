@@ -16,9 +16,9 @@ def correct(mesh,x):
 batch = 29
 
 epoch = sys.argv[1]
-mesh = np.load('checkpoints/results2d/mesh_'+str(epoch)+'.npy')
-label = np.load('checkpoints/results2d/label_'+str(epoch)+'.npy')
-pred = np.load('checkpoints/results2d/prediction_'+str(epoch)+'.npy')
+mesh = np.load('checkpoints/results/mesh_'+str(epoch)+'.npy')
+label = np.load('checkpoints/results/label_'+str(epoch)+'.npy')
+pred = np.load('checkpoints/results/prediction_'+str(epoch)+'.npy')
 pred = correct(mesh, pred)
 label = label[batch]
 

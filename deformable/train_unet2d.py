@@ -52,12 +52,12 @@ if __name__ == '__main__':
         val_label_path = val_label_path + [path+'/camera/' + v + '_filtered/']
 
     epoch_to_use = 23
-    use_previous_model = True
+    use_previous_model = False
     validate_each = 1
     
     in_channels = 3
     out_channels = 3
-    batch_size = 128
+    batch_size = 1
     lr = 1.0e-5
     n_epochs = 500
     momentum=0.9

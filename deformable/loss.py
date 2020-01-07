@@ -1,36 +1,35 @@
 import torch
 import numpy as np
 from torch import nn as nn
-from chamfer_distance.chamfer_distance import ChamferDistance
+from chamferdist.chamferdist import ChamferDistance
 
-def refine_mesh(mesh, factor):
+def refine_mesh(mesh, factor, device):
     batch,z,x,y =  mesh.size()
     new_x = (x-1)*factor+1
     new_y = (y-1)*factor+1
-    fine_mesh = torch.zeros([batch, z, new_x, new_y])
+    fine_mesh = torch.zeros([batch, z, new_x, new_y], device=device)
 
-    # Fill out each mesh
-    for n in range(batch):
-        # Fill out the rows 
+    # Fill out the rows 
+    for b in range(batch):
         for i in range(x):
-            cur_row = mesh[n,:,i,:]
+            cur_row = mesh[b,:,i,:]
             for j in range(y-1):
                 cur_elem = cur_row[:,j]
                 next_elem = cur_row[:,j+1]
                 for k in range(factor):
                     weight = float(k)
-                    fine_mesh[n,:,i*factor,j*factor+k] = (factor-weight)/factor*cur_elem + weight/factor*next_elem
-        fine_mesh[n,:,i*factor,-1] = mesh[n,:,i,-1]
+                    fine_mesh[b,:,i*factor,j*factor+k] = (factor-weight)/factor*cur_elem + weight/factor*next_elem
+                    fine_mesh[b,:,i*factor,-1] = mesh[b,:,i,-1]
                 
         # Fill out the columns
         for j in range(new_y):
-            cur_col = fine_mesh[n,:,:,j]
+            cur_col = fine_mesh[b,:,:,j]
             for i in range(x-1):
                 cur_elem = cur_col[:,i*factor]
                 next_elem = cur_col[:,(i+1)*factor]
                 for k in range(factor):
                     weight = float(k)
-                    fine_mesh[n,:,i*factor+k,j] = (factor-weight)/factor*cur_elem + weight/factor*next_elem
+                    fine_mesh[b,:,i*factor+k,j] = (factor-weight)/factor*cur_elem + weight/factor*next_elem
 
     return fine_mesh
 
@@ -44,24 +43,26 @@ class MeshLoss(nn.Module):
         self.batch_size = batch_size
         self.device = device
         self.chamfer = ChamferDistance()
+        self.fem_loss_fn = nn.MSELoss()
 
-    def forward(self, vertices, pc):
+    def forward(self, network_mesh, pc, fem_mesh):
         # get probabilities from logits
-        loss = torch.zeros(vertices.size()[0])
-        top = vertices[:,:,:,-1,:]
-        top = refine_mesh(top, 3)
-        top = top.reshape(vertices.size()[0],3,-1)
-        for i in range(vertices.size()[0]):
-            cur_v = top[i]
-            cur_v = torch.transpose(cur_v, 0,1).unsqueeze(0)
-            cur_pc = pc[i]
-            cur_pc = cur_pc[:,~(cur_pc==0).all(axis=0)]
-            cur_pc = torch.transpose(cur_pc, 0,1).unsqueeze(0)
+        top = network_mesh[:,:,:,-1,:]
+        bottom = network_mesh[:,:,:,0:-1,:]
+        fem = fem_mesh[:,:,:,0:-1,:]
 
-            dist1, dist2 = self.chamfer(cur_v.cpu(), cur_pc.cpu())
+        # Match the top, camera observed layer
+        top = refine_mesh(top, 3, self.device)
+        top = top.reshape(top.size()[0],top.size()[1],-1)
+        
+        pc = pc.contiguous()
+        top = top.contiguous()
+        dist1, dist2, idx1, idx2 = self.chamfer(top, pc)
 
-            # Only want pc -> mesh loss to ignore occluded regions
-            loss[i] = torch.mean(dist2) # + torch.mean(dist1)
+        # Match the bottom, FEM layers
+        fem_loss = self.fem_loss_fn(bottom, fem)
+        # Only want pc -> mesh loss to ignore occluded regions
+        loss = torch.mean(dist2) + fem_loss # + torch.mean(dist1)
 
         # Average the Dice score across all channels/classes
         return torch.mean(loss).to(self.device)
@@ -77,22 +78,24 @@ class MeshLoss2D(nn.Module):
         self.device = device
         self.chamfer = ChamferDistance()
 
-    def forward(self, vertices, pc):
+    def forward(self, network_mesh, pc):
         # get probabilities from logits
-        loss = torch.zeros(vertices.size()[0]).to(self.device)
-        fine_mesh = refine_mesh(vertices, 3)
-        top = fine_mesh.reshape(vertices.size()[0],3,-1)
-        for i in range(vertices.size()[0]):
-            cur_v = top[i]
+        loss = torch.zeros(network_mesh.size()[0]).to(self.device)
+        for i in range(network_mesh.size()[0]):            
+            cur_v = network_mesh[i]
+            cur_v = refine_mesh(cur_v, 3, self.device)
+            cur_v = cur_v.reshape(3,-1)
             cur_v = torch.transpose(cur_v, 0,1).unsqueeze(0)
+
             cur_pc = pc[i]
             cur_pc = cur_pc[:,~(cur_pc==0).all(axis=0)]
             cur_pc = torch.transpose(cur_pc, 0,1).unsqueeze(0)
 
-            dist1, dist2 = self.chamfer(cur_v.cpu(), cur_pc.cpu())
+            dist1, dist2, idx1, idx2 = self.chamfer(cur_v.contiguous(), cur_pc.continguous())
 
             # Only want pc -> mesh loss to ignore occluded regions
             loss[i] = torch.mean(dist2)
 
         # Average the Dice score across all channels/classes
         return torch.mean(loss)
+ 
