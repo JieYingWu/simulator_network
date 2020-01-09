@@ -1,14 +1,20 @@
 import os
 import torch
+import random
 import plyfile
 import numpy as np
 from torch.utils.data import Dataset
 
-def add_gaussian_noise(x, mean=0, stddev=3):
-    return x + (torch.randn(x.size()) + mean)* stddev
+scale = torch.tensor([5.28, 7.16, 7.86])
+def add_gaussian_noise(mesh):
+    x = torch.empty(mesh.size()[1:]).normal_(mean=0,std=scale[0]).unsqueeze(0)
+    y = torch.empty(mesh.size()[1:]).normal_(mean=0,std=scale[1]).unsqueeze(0)
+    z = torch.empty(mesh.size()[1:]).normal_(mean=0,std=scale[2]).unsqueeze(0)
+    modifier = torch.cat((x,y,z), axis=0)
+    return mesh + modifier
 
 class SimulatorDataset3D(Dataset):
-    def __init__(self, kinematics_path, simulator_path, label_path, augment=False, pc_length=50000):
+    def __init__(self, kinematics_path, simulator_path, label_path, augment=False, pc_length=20000):
         self.pc_length = pc_length
         self.augment= augment
         self.kinematics_array = None
@@ -38,7 +44,10 @@ class SimulatorDataset3D(Dataset):
             simulation = add_gaussian_noise(simulation)
         pc = plyfile.PlyData.read(self.label_array[idx])['vertex']
         pc = np.concatenate((np.expand_dims(pc['x'], 1), np.expand_dims(pc['y'],1), np.expand_dims(pc['z'],1)), 1)
-        pc = self._pad(pc)
+        indices = range(pc.shape[0])
+        random.shuffle(indices)
+        pc = pc[indices[0:self.pc_length], :]
+#        pc = self._pad(pc)
         pc = np.transpose(pc, (1,0))
         return torch.from_numpy(self.kinematics_array[idx,1:]).float(), simulation, torch.from_numpy(pc).float()
 

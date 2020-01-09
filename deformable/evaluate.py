@@ -3,7 +3,7 @@ import sys
 import torch
 import plyfile
 import numpy as np
-from chamfer_distance.chamfer_distance import ChamferDistance
+from chamferdist.chamferdist import ChamferDistance
 
 def refine_mesh(mesh, factor):
     x,y,z =  mesh.size()
@@ -34,18 +34,13 @@ def refine_mesh(mesh, factor):
 
     return fine_mesh
 
-old_naming = False
+
 mesh_path = sys.argv[1]
 gt_path = sys.argv[2]
-grid_order = np.loadtxt('grid_order.txt').astype(int)
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 mesh_files = os.listdir(mesh_path)
-if (old_naming):
-    mesh_order = np.array([int(x.split('.')[0][8:]) for x in mesh_files])
-    mesh_order = np.argsort(mesh_order).astype(int)
-    mesh_files = [mesh_files[i] for i in mesh_order]
-else:
-    mesh_files = sorted(mesh_files)
+mesh_files = sorted(mesh_files)
 gt_files = sorted(os.listdir(gt_path))
 loss = 0
 loss_fn = ChamferDistance()
@@ -57,22 +52,19 @@ for i in range(len(mesh_files)):
     except:
         print("Can't find ", mesh_files[i])
         exit()
-#    mesh = mesh[grid_order]
-#    mesh = mesh.reshape(25, 9, 9, 3)
     mesh = mesh.reshape(13, 5, 5, 3)
     mesh = mesh[:,-1,:,:]
-#    print(mesh[:,:,0])
     mesh = refine_mesh(mesh, 3)
-#    print(mesh[:,:,0])
-    mesh = mesh.reshape(-1,3).unsqueeze(0).float()
+    mesh = mesh.reshape(-1,3).unsqueeze(0).float().to(device)
 
     try:
         pc = plyfile.PlyData.read(gt_path + gt_files[i])['vertex']
     except:
         print(i, ' is out of range')
         exit()
-    pc = torch.from_numpy(np.concatenate((np.expand_dims(pc['x'], 1), np.expand_dims(pc['y'],1), np.expand_dims(pc['z'],1)), 1)).unsqueeze(0).float()
-    dist1, dist2 = loss_fn(mesh, pc)
+    pc = torch.from_numpy(np.concatenate((np.expand_dims(pc['x'], 1), np.expand_dims(pc['y'],1), np.expand_dims(pc['z'],1)), 1)).unsqueeze(0).float().to(device)
+    dist1, dist2, idx1, idx2 = loss_fn(mesh.contiguous(), pc.contiguous())
+    print(dist2.mean())
     loss += torch.mean(dist2) #dist[0]
 
 print(loss/len(mesh_files))

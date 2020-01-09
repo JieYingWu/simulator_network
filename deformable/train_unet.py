@@ -17,11 +17,12 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 scale = torch.zeros((1,3,1,1,1), device=device)
 scale[0,:,0,0,0] = torch.tensor([5.28, 7.16, 7.86])/2
+FEM_WEIGHT = 100
 
 def correct(mesh,x):
     corrected = mesh.clone().to(device)
     x = (x-0.5)*scale
-    corrected[:,:,:,-1,:] = mesh[:,:,:,-1,:] + x[:,:,:,-1,:]
+    corrected = mesh + x
     return corrected
     
 if __name__ == '__main__':
@@ -70,7 +71,7 @@ if __name__ == '__main__':
 #    model = utils.init_net(model)
 #    summary(model, input_size=(3, img_size[0], img_size[1], img_size[2]))
 
-    loss_fn = MeshLoss(batch_size, device)
+    loss_fn = MeshLoss(batch_size, FEM_WEIGHT, device)
     optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum) 
     scheduler = ReduceLROnPlateau(optimizer)
 

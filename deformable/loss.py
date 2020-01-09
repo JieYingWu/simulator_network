@@ -38,12 +38,13 @@ class MeshLoss(nn.Module):
     """Computes loss from a point cloud to a mesh
     """
 
-    def __init__(self, batch_size, device):
+    def __init__(self, batch_size, weight, device):
         super(MeshLoss, self).__init__()
         self.batch_size = batch_size
         self.device = device
         self.chamfer = ChamferDistance()
         self.fem_loss_fn = nn.MSELoss()
+        self.weight = weight
 
     def forward(self, network_mesh, pc, fem_mesh):
         # get probabilities from logits
@@ -55,15 +56,16 @@ class MeshLoss(nn.Module):
         top = refine_mesh(top, 3, self.device)
         top = top.reshape(top.size()[0],top.size()[1],-1)
         
-        pc = pc.contiguous()
-        top = top.contiguous()
+        pc = pc.permute(0,2,1).contiguous()
+        top = top.permute(0,2,1).contiguous()
         dist1, dist2, idx1, idx2 = self.chamfer(top, pc)
 
         # Match the bottom, FEM layers
         fem_loss = self.fem_loss_fn(bottom, fem)
         # Only want pc -> mesh loss to ignore occluded regions
-        loss = torch.mean(dist2) + fem_loss # + torch.mean(dist1)
-
+#        print(torch.mean(dist1), fem_loss*self.weight)
+        loss = torch.mean(dist2) + fem_loss * self.weight# + torch.mean(dist1)
+        
         # Average the Dice score across all channels/classes
         return torch.mean(loss).to(self.device)
 
