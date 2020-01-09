@@ -5,3 +5,4 @@
 rigid/checkpoints/*
 deformable/checkpoints/*
 processing/test*
+simulator/data*
