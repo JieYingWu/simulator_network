@@ -59,6 +59,9 @@ class MeshLoss(nn.Module):
         pc = pc.permute(0,2,1).contiguous()
         top = top.permute(0,2,1).contiguous()
         dist1, dist2, idx1, idx2 = self.chamfer(top, pc)
+        print('--------------------------')
+        print(idx1)
+        print(idx2)
 
         # Match the bottom, FEM layers
         fem_loss = self.fem_loss_fn(bottom, fem)
@@ -83,21 +86,14 @@ class MeshLoss2D(nn.Module):
     def forward(self, network_mesh, pc):
         # get probabilities from logits
         loss = torch.zeros(network_mesh.size()[0]).to(self.device)
-        for i in range(network_mesh.size()[0]):            
-            cur_v = network_mesh[i]
-            cur_v = refine_mesh(cur_v, 3, self.device)
-            cur_v = cur_v.reshape(3,-1)
-            cur_v = torch.transpose(cur_v, 0,1).unsqueeze(0)
 
-            cur_pc = pc[i]
-            cur_pc = cur_pc[:,~(cur_pc==0).all(axis=0)]
-            cur_pc = torch.transpose(cur_pc, 0,1).unsqueeze(0)
-
-            dist1, dist2, idx1, idx2 = self.chamfer(cur_v.contiguous(), cur_pc.continguous())
-
-            # Only want pc -> mesh loss to ignore occluded regions
-            loss[i] = torch.mean(dist2)
+        mesh = refine_mesh(network_mesh, 3, self.devic)
+        mesh = mesh.reshape(mesh.size()[0],mesh.size()[1],-1)
+        mesh = mesh.permute(0,2,1).contiguous()
+        pc = pc.permute(0,2,1).contiguous()
+        
+        dist1, dist2, idx1, idx2 = self.chamfer(mesh, pc)
 
         # Average the Dice score across all channels/classes
-        return torch.mean(loss)
+        return torch.mean(dist2)
  

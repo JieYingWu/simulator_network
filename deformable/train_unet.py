@@ -20,11 +20,15 @@ scale[0,:,0,0,0] = torch.tensor([5.28, 7.16, 7.86])/2
 FEM_WEIGHT = 100
 
 def correct(mesh,x):
-    corrected = mesh.clone().to(device)
     x = (x-0.5)*scale
     corrected = mesh + x
     return corrected
-    
+
+def concat_mesh_kinematics(mesh, kinematics):
+    kinematics = kinematics.view(kinematics.size()[0], kinematics.size()[1],1,1,1)
+    kinematics = kinematics.repeat(1,1,mesh.size()[2],mesh.size()[3],mesh.size()[4])
+    return torch.cat((mesh, kinematics), axis=1)
+            
 if __name__ == '__main__':
     
     root = Path("checkpoints")
@@ -41,6 +45,11 @@ if __name__ == '__main__':
         train_kinematics_path = train_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_processed_interpolated.csv']
         train_simulator_path = train_simulator_path + [path+'/simulator/5e3_data/' + v + '/']
         train_label_path = train_label_path + [path+'/camera/' + v + '_filtered/']
+#    for v in train_set:
+#        train_kinematics_path = train_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_processed_interpolated.csv']
+#        train_simulator_path = train_simulator_path + [path+'/simulator/5e3_data/' + v + '_net/']
+#        train_label_path = train_label_path + [path+'/camera/' + v + '_filtered/']
+
 
     print(train_kinematics_path)
     val_kinematics_path = []
@@ -51,11 +60,11 @@ if __name__ == '__main__':
         val_simulator_path = val_simulator_path + [path+'/simulator/5e3_data/' + v + '/']
         val_label_path = val_label_path + [path+'/camera/' + v + '_filtered/']
 
-    epoch_to_use = 34
+    epoch_to_use = 4
     use_previous_model = False
     validate_each = 1
     
-    in_channels = 3
+    in_channels = 10
     out_channels = 3
     batch_size = 128
     lr = 1.0e-5
@@ -67,7 +76,7 @@ if __name__ == '__main__':
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     
-    model = UNet3D(in_channels=in_channels, out_channels=out_channels).to(device)
+    model = UNet3D(in_channels=in_channels, out_channels=out_channels, dropout=0.3).to(device)
 #    model = utils.init_net(model)
 #    summary(model, input_size=(3, img_size[0], img_size[1], img_size[2]))
 
@@ -129,7 +138,9 @@ if __name__ == '__main__':
 
             for i, (kinematics, mesh, label) in enumerate(train_loader):
                 kinematics, mesh, label = kinematics.to(device), mesh.to(device), label.to(device)
-                pred = model(kinematics, mesh)
+
+                mesh_kinematics = concat_mesh_kinematics(mesh, kinematics)
+                pred = model(mesh_kinematics)
                 corrected = correct(mesh, pred)
                 loss = loss_fn(corrected, label, mesh)
                 epoch_loss += loss.item()
@@ -149,7 +160,8 @@ if __name__ == '__main__':
                     model.eval()
                     for j, (kinematics, mesh, label) in enumerate(val_loader):
                         kinematics, mesh, label = kinematics.to(device), mesh.to(device), label.to(device)
-                        pred = model(kinematics, mesh)
+                        mesh_kinematics = concat_mesh_kinematics(mesh, kinematics)
+                        pred = model(mesh_kinematics)
                         corrected = correct(mesh, pred)
                         loss = loss_fn(corrected, label, mesh)
                         all_val_loss.append(loss.item())

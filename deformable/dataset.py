@@ -18,11 +18,12 @@ class SimulatorDataset3D(Dataset):
         self.pc_length = pc_length
         self.augment= augment
         self.kinematics_array = None
-        for path in  kinematics_path:
+        for path in kinematics_path:
             if self.kinematics_array is None:
                 self.kinematics_array = np.genfromtxt(path, delimiter=',')
             else:
                 self.kinematics_array = np.concatenate((self.kinematics_array, np.genfromtxt(path, delimiter=',')))
+        self.kinematics_array = torch.from_numpy(self.kinematics_array).float()
                 
         self.simulator_array = []
         for path in simulator_path:
@@ -49,7 +50,8 @@ class SimulatorDataset3D(Dataset):
         pc = pc[indices[0:self.pc_length], :]
 #        pc = self._pad(pc)
         pc = np.transpose(pc, (1,0))
-        return torch.from_numpy(self.kinematics_array[idx,1:]).float(), simulation, torch.from_numpy(pc).float()
+
+        return self.kinematics_array[idx,1:], simulation, torch.from_numpy(pc).float()
 
     def _reshape(self, x):
         y = x.reshape(13, 5, 5, 3)

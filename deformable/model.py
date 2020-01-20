@@ -5,34 +5,34 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class UNet3D(nn.Module):
-    def __init__(self, in_channels, out_channels, conv_depths=(64, 128, 256)):#, 512, 1024)):
+    def __init__(self, in_channels, out_channels, conv_depths=(64, 128, 256), dropout=False):#, 512, 1024)):
         assert len(conv_depths) > 2, 'conv_depths must have at least 3 members'
 
         super(UNet3D, self).__init__()
 
         # defining encoder layers
         encoder_layers = []
-        encoder_layers.append(First3D(in_channels, conv_depths[0], conv_depths[0]))
-        encoder_layers.extend([Encoder3D(conv_depths[i], conv_depths[i + 1], conv_depths[i + 1])
+        encoder_layers.append(First3D(in_channels, conv_depths[0], conv_depths[0], dropout=dropout))
+        encoder_layers.extend([Encoder3D(conv_depths[i], conv_depths[i + 1], conv_depths[i + 1], dropout=dropout)
                                for i in range(len(conv_depths)-2)])
 
         # defining decoder layers
         decoder_layers = []
-        decoder_layers.extend([Decoder3D(2 * conv_depths[i + 1], 2 * conv_depths[i], 2 * conv_depths[i], conv_depths[i])
+        decoder_layers.extend([Decoder3D(2 * conv_depths[i + 1], 2 * conv_depths[i], 2 * conv_depths[i], conv_depths[i], dropout=dropout)
                                for i in reversed(range(len(conv_depths)-2))])
         decoder_layers.append(Last3D(conv_depths[1], conv_depths[0], out_channels))
 
         # encoder, center and decoder layers
         self.encoder_layers = nn.Sequential(*encoder_layers)
-        self.center = Center3D(conv_depths[-2], conv_depths[-1], conv_depths[-1], conv_depths[-2])
+        self.center = Center3D(conv_depths[-2], conv_depths[-1], conv_depths[-1], conv_depths[-2], dropout=dropout)
         self.decoder_layers = nn.Sequential(*decoder_layers)
 
-    def forward(self, kinematics, mesh, return_all=False):
-        x_enc = [mesh]
+    def forward(self, x, return_all=False):
+        x_enc = [x]
         for enc_layer in self.encoder_layers:
             x_enc.append(enc_layer(x_enc[-1]))
 
-        x_dec = [self.center(x_enc[-1], kinematics)]
+        x_dec = [self.center(x_enc[-1])]
         for dec_layer_idx, dec_layer in enumerate(self.decoder_layers):
             x_opposite = x_enc[-1-dec_layer_idx]
             x_cat = torch.cat(
@@ -65,7 +65,7 @@ def pad_to_shape(this, shp):
 
 
 class First3D(nn.Module):
-    def __init__(self, in_channels, middle_channels, out_channels):
+    def __init__(self, in_channels, middle_channels, out_channels, dropout=False):
         super(First3D, self).__init__()
 
         layers = [
@@ -77,6 +77,10 @@ class First3D(nn.Module):
             nn.ReLU(inplace=True)
         ]
 
+        if dropout:
+            assert 0 <= dropout <= 1, 'dropout must be between 0 and 1'
+            layers.append(nn.Dropout3d(p=dropout))
+        
         self.first = nn.Sequential(*layers)
 
     def forward(self, x):
@@ -86,7 +90,7 @@ class First3D(nn.Module):
 class Encoder3D(nn.Module):
     def __init__(
             self, in_channels, middle_channels, out_channels,
-            downsample_kernel=2
+            dropout=False, downsample_kernel=2
     ):
         super(Encoder3D, self).__init__()
 
@@ -99,7 +103,11 @@ class Encoder3D(nn.Module):
             nn.BatchNorm3d(out_channels),
             nn.ReLU(inplace=True)
         ]
-
+        
+        if dropout:
+            assert 0 <= dropout <= 1, 'dropout must be between 0 and 1'
+            layers.append(nn.Dropout3d(p=dropout))
+        
         self.encoder = nn.Sequential(*layers)
 
     def forward(self, x):
@@ -107,45 +115,34 @@ class Encoder3D(nn.Module):
 
 
 class Center3D(nn.Module):
-    def __init__(self, in_channels, middle_channels, out_channels, deconv_channels):
+    def __init__(self, in_channels, middle_channels, out_channels, deconv_channels, dropout=False):
         super(Center3D, self).__init__()
 
-        layers1 = [
+        layers = [
             nn.MaxPool3d(kernel_size=2),
             nn.Conv3d(in_channels, middle_channels, kernel_size=3, padding=1),
             nn.BatchNorm3d(middle_channels),
             nn.ReLU(inplace=True),
-        ]
-        layers2 = [
-            nn.Conv3d(middle_channels+7, out_channels+7, kernel_size=3, padding=1),
-            nn.BatchNorm3d(out_channels+7),
-            nn.ReLU(inplace=True),
-            nn.Conv3d(middle_channels+7, out_channels+7, kernel_size=3, padding=1),
-            nn.BatchNorm3d(out_channels+7),
-            nn.ReLU(inplace=True),
-            nn.Conv3d(middle_channels+7, out_channels+3, kernel_size=3, padding=1),
-            nn.BatchNorm3d(out_channels+3),
-            nn.ReLU(inplace=True),
-            nn.Conv3d(middle_channels+3, out_channels, kernel_size=3, padding=1),
+            nn.Conv3d(middle_channels, out_channels, kernel_size=3, padding=1),
             nn.BatchNorm3d(out_channels),
             nn.ReLU(inplace=True),
             nn.ConvTranspose3d(out_channels, deconv_channels, kernel_size=2, stride=2)
+
         ]
 
-        self.center1 = nn.Sequential(*layers1)
-        self.center2 = nn.Sequential(*layers2)
+        if dropout:
+            assert 0 <= dropout <= 1, 'dropout must be between 0 and 1'
+            layers.append(nn.Dropout3d(p=dropout))
         
-    def forward(self, x, kinematics):
-        x = self.center1(x)
-        kinematics = kinematics.view(kinematics.size()[0], kinematics.size()[1],1,1,1)
-        kinematics = kinematics.repeat(1,1,x.size()[2],x.size()[3],x.size()[4])
-        x = torch.cat((x, kinematics), axis=1)
-        x = self.center2(x)
+        self.center = nn.Sequential(*layers)
+        
+    def forward(self, x):
+        x = self.center(x)
         return x 
 
 
 class Decoder3D(nn.Module):
-    def __init__(self, in_channels, middle_channels, out_channels, deconv_channels):
+    def __init__(self, in_channels, middle_channels, out_channels, deconv_channels, dropout=False):
         super(Decoder3D, self).__init__()
 
         layers = [
@@ -158,6 +155,10 @@ class Decoder3D(nn.Module):
             nn.ConvTranspose3d(out_channels, deconv_channels, kernel_size=2, stride=2)
         ]
 
+        if dropout:
+            assert 0 <= dropout <= 1, 'dropout must be between 0 and 1'
+            layers.append(nn.Dropout3d(p=dropout))
+        
         self.decoder = nn.Sequential(*layers)
 
     def forward(self, x):
@@ -169,13 +170,14 @@ class Last3D(nn.Module):
         super(Last3D, self).__init__()
 
         layers = [
-            nn.Conv3d(in_channels, middle_channels, kernel_size=3, padding=1),
-            nn.BatchNorm3d(middle_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv3d(middle_channels, middle_channels, kernel_size=3, padding=1),
-            nn.BatchNorm3d(middle_channels),
-            nn.ReLU(inplace=True),
-            nn.Conv3d(middle_channels, out_channels, kernel_size=1),
+#            nn.Conv3d(in_channels, middle_channels, kernel_size=3, padding=1),
+#            nn.BatchNorm3d(middle_channels),
+#            nn.ReLU(inplace=True),
+#            nn.Conv3d(middle_channels, middle_channels, kernel_size=3, padding=1),
+#            nn.BatchNorm3d(middle_channels),
+#            nn.ReLU(inplace=True),
+#            nn.Conv3d(middle_channels, out_channels, kernel_size=1),
+            nn.Conv3d(in_channels, out_channels, kernel_size=1),
             nn.Sigmoid()
         ]
 
