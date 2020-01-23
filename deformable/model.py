@@ -4,6 +4,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
+class simuNet(nn.Module):
+    def __init__(self, in_channels, out_channels, conv_depth= (32,64,128), dropout=False):
+
+        super(simuNet, self).__init__()
+
+        
+
 class UNet3D(nn.Module):
     def __init__(self, in_channels, out_channels, conv_depths=(64, 128, 256), dropout=False):#, 512, 1024)):
         assert len(conv_depths) > 2, 'conv_depths must have at least 3 members'
@@ -20,7 +28,7 @@ class UNet3D(nn.Module):
         decoder_layers = []
         decoder_layers.extend([Decoder3D(2 * conv_depths[i + 1], 2 * conv_depths[i], 2 * conv_depths[i], conv_depths[i], dropout=dropout)
                                for i in reversed(range(len(conv_depths)-2))])
-        decoder_layers.append(Last3D(conv_depths[1], conv_depths[0], out_channels))
+        decoder_layers.append(Last3D(conv_depths[1], conv_depths[0], out_channels, dropout=dropout))
 
         # encoder, center and decoder layers
         self.encoder_layers = nn.Sequential(*encoder_layers)
@@ -72,15 +80,13 @@ class First3D(nn.Module):
             nn.Conv3d(in_channels, middle_channels, kernel_size=3, padding=1),
             nn.BatchNorm3d(middle_channels),
             nn.ReLU(inplace=True),
+            nn.Dropout3d(p=dropout),
             nn.Conv3d(middle_channels, out_channels, kernel_size=3, padding=1),
             nn.BatchNorm3d(out_channels),
-            nn.ReLU(inplace=True)
+            nn.ReLU(inplace=True),
+            nn.Dropout3d(p=dropout),
         ]
 
-        if dropout:
-            assert 0 <= dropout <= 1, 'dropout must be between 0 and 1'
-            layers.append(nn.Dropout3d(p=dropout))
-        
         self.first = nn.Sequential(*layers)
 
     def forward(self, x):
@@ -99,14 +105,12 @@ class Encoder3D(nn.Module):
             nn.Conv3d(in_channels, middle_channels, kernel_size=3, padding=1),
             nn.BatchNorm3d(middle_channels),
             nn.ReLU(inplace=True),
+            nn.Dropout3d(p=dropout),
             nn.Conv3d(middle_channels, out_channels, kernel_size=3, padding=1),
             nn.BatchNorm3d(out_channels),
-            nn.ReLU(inplace=True)
+            nn.ReLU(inplace=True),
+            nn.Dropout3d(p=dropout),
         ]
-        
-        if dropout:
-            assert 0 <= dropout <= 1, 'dropout must be between 0 and 1'
-            layers.append(nn.Dropout3d(p=dropout))
         
         self.encoder = nn.Sequential(*layers)
 
@@ -123,16 +127,14 @@ class Center3D(nn.Module):
             nn.Conv3d(in_channels, middle_channels, kernel_size=3, padding=1),
             nn.BatchNorm3d(middle_channels),
             nn.ReLU(inplace=True),
+            nn.Dropout3d(p=dropout),
             nn.Conv3d(middle_channels, out_channels, kernel_size=3, padding=1),
             nn.BatchNorm3d(out_channels),
             nn.ReLU(inplace=True),
+            nn.Dropout3d(p=dropout),
             nn.ConvTranspose3d(out_channels, deconv_channels, kernel_size=2, stride=2)
 
         ]
-
-        if dropout:
-            assert 0 <= dropout <= 1, 'dropout must be between 0 and 1'
-            layers.append(nn.Dropout3d(p=dropout))
         
         self.center = nn.Sequential(*layers)
         
@@ -149,16 +151,14 @@ class Decoder3D(nn.Module):
             nn.Conv3d(in_channels, middle_channels, kernel_size=3, padding=1),
             nn.BatchNorm3d(middle_channels),
             nn.ReLU(inplace=True),
+            nn.Dropout3d(p=dropout),
             nn.Conv3d(middle_channels, out_channels, kernel_size=3, padding=1),
             nn.BatchNorm3d(out_channels),
             nn.ReLU(inplace=True),
+            nn.Dropout3d(p=dropout),
             nn.ConvTranspose3d(out_channels, deconv_channels, kernel_size=2, stride=2)
         ]
 
-        if dropout:
-            assert 0 <= dropout <= 1, 'dropout must be between 0 and 1'
-            layers.append(nn.Dropout3d(p=dropout))
-        
         self.decoder = nn.Sequential(*layers)
 
     def forward(self, x):
@@ -166,18 +166,20 @@ class Decoder3D(nn.Module):
 
 
 class Last3D(nn.Module):
-    def __init__(self, in_channels, middle_channels, out_channels):
+    def __init__(self, in_channels, middle_channels, out_channels, dropout=False):
         super(Last3D, self).__init__()
 
         layers = [
-#            nn.Conv3d(in_channels, middle_channels, kernel_size=3, padding=1),
-#            nn.BatchNorm3d(middle_channels),
-#            nn.ReLU(inplace=True),
-#            nn.Conv3d(middle_channels, middle_channels, kernel_size=3, padding=1),
-#            nn.BatchNorm3d(middle_channels),
-#            nn.ReLU(inplace=True),
-#            nn.Conv3d(middle_channels, out_channels, kernel_size=1),
-            nn.Conv3d(in_channels, out_channels, kernel_size=1),
+            nn.Conv3d(in_channels, middle_channels, kernel_size=3, padding=1),
+            nn.BatchNorm3d(middle_channels),
+            nn.ReLU(inplace=True),
+            nn.Dropout3d(p=dropout),
+            nn.Conv3d(middle_channels, middle_channels, kernel_size=3, padding=1),
+            nn.BatchNorm3d(middle_channels),
+            nn.ReLU(inplace=True),
+            nn.Dropout3d(p=dropout),
+            nn.Conv3d(middle_channels, out_channels, kernel_size=1),
+#            nn.Conv3d(in_channels, out_channels, kernel_size=1),
             nn.Sigmoid()
         ]
 

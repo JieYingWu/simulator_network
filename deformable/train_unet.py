@@ -15,26 +15,14 @@ from torchsummary import summary
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-scale = torch.zeros((1,3,1,1,1), device=device)
-scale[0,:,0,0,0] = torch.tensor([5.28, 7.16, 7.86])/2
-FEM_WEIGHT = 100
-
-def correct(mesh,x):
-    x = (x-0.5)*scale
-    corrected = mesh + x
-    return corrected
-
-def concat_mesh_kinematics(mesh, kinematics):
-    kinematics = kinematics.view(kinematics.size()[0], kinematics.size()[1],1,1,1)
-    kinematics = kinematics.repeat(1,1,mesh.size()[2],mesh.size()[3],mesh.size()[4])
-    return torch.cat((mesh, kinematics), axis=1)
-            
+FEM_WEIGHT = 5
+ 
 if __name__ == '__main__':
     
     root = Path("checkpoints")
     num_workers = 4
-    train_set = ['data3', 'data4', 'data5',  'data6', 'data7', 'data8', 'data9', 'data10', 'data11']
-    val_set = ['data0']
+    train_set = ['data6']# 'data3', 'data4', 'data5',  'data6', 'data7', 'data8', 'data9', 'data10', 'data11']
+    val_set = ['data4']# 'data0']
     # Testing on data1 and 2
     
     path = '../../dataset/2019-10-09-GelPhantom1'
@@ -60,9 +48,9 @@ if __name__ == '__main__':
         val_simulator_path = val_simulator_path + [path+'/simulator/5e3_data/' + v + '/']
         val_label_path = val_label_path + [path+'/camera/' + v + '_filtered/']
 
-    epoch_to_use = 4
+    epoch_to_use = 1
     use_previous_model = False
-    validate_each = 1
+    validate_each = 100
     
     in_channels = 10
     out_channels = 3
@@ -76,7 +64,7 @@ if __name__ == '__main__':
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     
-    model = UNet3D(in_channels=in_channels, out_channels=out_channels, dropout=0.3).to(device)
+    model = UNet3D(in_channels=in_channels, out_channels=out_channels, dropout=0.1).to(device)
 #    model = utils.init_net(model)
 #    summary(model, input_size=(3, img_size[0], img_size[1], img_size[2]))
 
@@ -139,9 +127,9 @@ if __name__ == '__main__':
             for i, (kinematics, mesh, label) in enumerate(train_loader):
                 kinematics, mesh, label = kinematics.to(device), mesh.to(device), label.to(device)
 
-                mesh_kinematics = concat_mesh_kinematics(mesh, kinematics)
+                mesh_kinematics = utils.concat_mesh_kinematics(mesh, kinematics)
                 pred = model(mesh_kinematics)
-                corrected = correct(mesh, pred)
+                corrected = utils.correct(mesh, pred)
                 loss = loss_fn(corrected, label, mesh)
                 epoch_loss += loss.item()
 
@@ -152,17 +140,20 @@ if __name__ == '__main__':
                 tq.update(batch_size)
                 tq.set_postfix(loss=' loss={:.5f}'.format(mean_loss))
                 step += 1
-                
+
+            model_path = model_root / "model_{}.pt".format(e)
+            save(e, model, model_path, mean_loss, optimizer, scheduler)
+
             if e % validate_each == 0:
                 torch.cuda.empty_cache()
                 all_val_loss = []
                 with torch.no_grad():
-                    model.eval()
+#                    model.eval()
                     for j, (kinematics, mesh, label) in enumerate(val_loader):
                         kinematics, mesh, label = kinematics.to(device), mesh.to(device), label.to(device)
-                        mesh_kinematics = concat_mesh_kinematics(mesh, kinematics)
+                        mesh_kinematics = utils.concat_mesh_kinematics(mesh, kinematics)
                         pred = model(mesh_kinematics)
-                        corrected = correct(mesh, pred)
+                        corrected = utils.correct(mesh, pred)
                         loss = loss_fn(corrected, label, mesh)
                         all_val_loss.append(loss.item())
 

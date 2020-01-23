@@ -53,8 +53,10 @@ for i in range(len(mesh_files)):
         print("Can't find ", mesh_files[i])
         exit()
     mesh = mesh.reshape(13, 5, 5, 3)
+#    print(mesh[:,-1,:,1])
     mesh = mesh[:,-1,:,:]
     mesh = refine_mesh(mesh, 3)
+ 
     mesh = mesh.reshape(-1,3).unsqueeze(0).float().to(device)
 
     try:

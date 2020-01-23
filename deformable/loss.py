@@ -3,6 +3,9 @@ import numpy as np
 from torch import nn as nn
 from chamferdist.chamferdist import ChamferDistance
 
+import sys
+np.set_printoptions(threshold=sys.maxsize)
+
 def refine_mesh(mesh, factor, device):
     batch,z,x,y =  mesh.size()
     new_x = (x-1)*factor+1
@@ -51,7 +54,7 @@ class MeshLoss(nn.Module):
         top = network_mesh[:,:,:,-1,:]
         bottom = network_mesh[:,:,:,0:-1,:]
         fem = fem_mesh[:,:,:,0:-1,:]
-
+        
         # Match the top, camera observed layer
         top = refine_mesh(top, 3, self.device)
         top = top.reshape(top.size()[0],top.size()[1],-1)
@@ -59,18 +62,26 @@ class MeshLoss(nn.Module):
         pc = pc.permute(0,2,1).contiguous()
         top = top.permute(0,2,1).contiguous()
         dist1, dist2, idx1, idx2 = self.chamfer(top, pc)
-        print('--------------------------')
-        print(idx1)
-        print(idx2)
+
+        if False:
+            num = 10
+            print('--------------------------')
+            idx = idx1[0,0:num].detach().cpu().numpy()
+            dist = dist1[0,0:num].detach().cpu().numpy()
+            print(idx)
+            print(dist)
+            print(pc[0].detach().cpu().numpy()[idx])
+            print(top[0,0:num])
+            print(fem[0,0,0,:,:])
+            exit()
 
         # Match the bottom, FEM layers
-        fem_loss = self.fem_loss_fn(bottom, fem)
+        fem_loss = self.fem_loss_fn(network_mesh, fem_mesh)
         # Only want pc -> mesh loss to ignore occluded regions
 #        print(torch.mean(dist1), fem_loss*self.weight)
-        loss = torch.mean(dist2) + fem_loss * self.weight# + torch.mean(dist1)
-        
+        loss = torch.mean(dist2) + fem_loss * self.weight + torch.mean(dist1)
         # Average the Dice score across all channels/classes
-        return torch.mean(loss).to(self.device)
+        return loss
 
 
 class MeshLoss2D(nn.Module):
