@@ -6,7 +6,7 @@ sys.path.insert(0,'../processing/')
 sys.path.insert(0,'../deformable/')
 import utils
 import geometry_util as geo
-from model import UNet3D
+from model import UNet3D, SimuNet
 
 import gc
 
@@ -23,9 +23,10 @@ ensemble_size = 19
 ## Load network ##
 in_channels = 10
 out_channels = 3
-network_path = Path('../deformable/checkpoints/models/model_' + sys.argv[2] + '.pt')
+#network_path = Path('../deformable/checkpoints/models/model_' + sys.argv[2] + '.pt')
+network_path = Path('../deformable/augmentation_model.pt')
 
-net = UNet3D(in_channels=in_channels, out_channels=out_channels, dropout=0.1)
+net = SimuNet(in_channels=in_channels, out_channels=out_channels, dropout=0.1)
 # Load previous model if requested
 if network_path.exists():
     state = torch.load(str(network_path))
@@ -44,7 +45,7 @@ steps = robot_pos.size()[0]
 ## Load mesh ##
 simulator_file = '../../dataset/2019-10-09-GelPhantom1/simulator/5e3_data/' + folder_name + '/position0001.txt'
 mesh = torch.from_numpy(utils.reshape_volume(np.genfromtxt(simulator_file))).float().unsqueeze(0).to(device)
-        
+
 ## Run ##
 for i in range(steps):
     cur_pos = robot_pos[i,1:8].unsqueeze(0)
@@ -54,13 +55,12 @@ for i in range(steps):
     for j in range(ensemble_size):
         update = net(mesh_kinematics)
         correction = correction + update
-#        print(update[0,1,:,-1,:])
 #    exit()
     network_correction = (correction / (ensemble_size + 1)).detach()
-#    print(network_correction[0,1,0])
+#    print(network_correction[0,0,0])
 #    print(mesh[0,2,0,4,4])
     mesh = utils.correct(mesh, network_correction)
-    
+#    print(mesh[0,2,:,-1,:])
     write_out = mesh.clone().cpu().numpy().reshape(3,-1).transpose()
 
 #    write_out = correct(mesh, network_correction)

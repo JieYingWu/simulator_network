@@ -4,7 +4,7 @@ import numpy as np
 from pathlib import Path
 from dataset import SimulatorDataset3D
 
-from model import UNet3D
+from model import UNet3D, SimuNet
 from loss import MeshLoss
 
 import torch
@@ -15,7 +15,7 @@ from torchsummary import summary
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-FEM_WEIGHT = 5
+FEM_WEIGHT = 500
  
 if __name__ == '__main__':
     
@@ -48,13 +48,13 @@ if __name__ == '__main__':
         val_simulator_path = val_simulator_path + [path+'/simulator/5e3_data/' + v + '/']
         val_label_path = val_label_path + [path+'/camera/' + v + '_filtered/']
 
-    epoch_to_use = 1
+    epoch_to_use = 7
     use_previous_model = False
-    validate_each = 100
+    validate_each = 5
     
     in_channels = 10
     out_channels = 3
-    batch_size = 128
+    batch_size = 1
     lr = 1.0e-5
     n_epochs = 500
     momentum=0.9
@@ -64,11 +64,17 @@ if __name__ == '__main__':
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     
-    model = UNet3D(in_channels=in_channels, out_channels=out_channels, dropout=0.1).to(device)
+    model = SimuNet(in_channels=in_channels, out_channels=out_channels, dropout=0.1).to(device)
 #    model = utils.init_net(model)
 #    summary(model, input_size=(3, img_size[0], img_size[1], img_size[2]))
 
-    loss_fn = MeshLoss(batch_size, FEM_WEIGHT, device)
+    base_mesh = np.genfromtxt('../../dataset/2019-10-09-GelPhantom1/simulator/5e3_data/data0/position0001.txt')
+    base_mesh = torch.from_numpy(base_mesh).float().to(device)
+    base_mesh = base_mesh.reshape(13,5,5,3).permute(3,0,1,2).unsqueeze(0)
+    print(base_mesh.size())
+#    print(base_mesh[0,1,:,-1,:])
+
+    loss_fn = MeshLoss(batch_size, FEM_WEIGHT, base_mesh, device)
     optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum) 
     scheduler = ReduceLROnPlateau(optimizer)
 
@@ -112,7 +118,7 @@ if __name__ == '__main__':
         'optimizer': optimizer.state_dict(),
         'scheduler': scheduler.state_dict()
     }, str(model_path))
-
+    
     try:    
         for e in range(epoch, n_epochs + 1):
 #            for param_group in optimizer.param_groups:
@@ -123,14 +129,15 @@ if __name__ == '__main__':
             tq = tqdm.tqdm(total=(len(train_loader) * batch_size))
             tq.set_description('Epoch {}, lr {}'.format(e, lr))
             epoch_loss = 0
+            train_dataset.__set_network__()
 
-            for i, (kinematics, mesh, label) in enumerate(train_loader):
-                kinematics, mesh, label = kinematics.to(device), mesh.to(device), label.to(device)
+            for i, (kinematics, mesh, label, mesh_next) in enumerate(train_loader):
+                kinematics, mesh, label, mesh_next = kinematics.to(device), mesh.to(device), label.to(device), mesh_next.to(device)
 
                 mesh_kinematics = utils.concat_mesh_kinematics(mesh, kinematics)
                 pred = model(mesh_kinematics)
                 corrected = utils.correct(mesh, pred)
-                loss = loss_fn(corrected, label, mesh)
+                loss = loss_fn(corrected, label, mesh_next)
                 epoch_loss += loss.item()
 
                 optimizer.zero_grad()
@@ -141,7 +148,7 @@ if __name__ == '__main__':
                 tq.set_postfix(loss=' loss={:.5f}'.format(mean_loss))
                 step += 1
 
-            model_path = model_root / "model_{}.pt".format(e)
+            model_path = "augmentation_model.pt"
             save(e, model, model_path, mean_loss, optimizer, scheduler)
 
             if e % validate_each == 0:

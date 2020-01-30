@@ -5,11 +5,36 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class simuNet(nn.Module):
+class SimuNet(nn.Module):
     def __init__(self, in_channels, out_channels, conv_depth= (32,64,128), dropout=False):
 
-        super(simuNet, self).__init__()
+        super(SimuNet, self).__init__()
+        
+        layers = [
+            nn.Conv3d(in_channels, conv_depth[0], kernel_size=3, padding=1),
+            nn.BatchNorm3d(conv_depth[0]),
+            nn.ReLU(inplace=True),
+            nn.Dropout3d(p=dropout),
+            nn.Conv3d(conv_depth[0], conv_depth[1], kernel_size=3, padding=1),
+            nn.BatchNorm3d(conv_depth[1]),
+            nn.ReLU(inplace=True),
+            nn.Dropout3d(p=dropout),
+            nn.Conv3d(conv_depth[1], conv_depth[2], kernel_size=3, padding=1),
+            nn.BatchNorm3d(conv_depth[2]),
+            nn.ReLU(inplace=True),
+            nn.Dropout3d(p=dropout),
+            nn.Conv3d(conv_depth[2], out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm3d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Dropout3d(p=dropout),
+            nn.Conv3d(out_channels, out_channels, kernel_size=3, padding=1),
+            nn.Tanh()
+        ]
 
+        self.layers = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.layers(x)
         
 
 class UNet3D(nn.Module):
@@ -180,7 +205,7 @@ class Last3D(nn.Module):
             nn.Dropout3d(p=dropout),
             nn.Conv3d(middle_channels, out_channels, kernel_size=1),
 #            nn.Conv3d(in_channels, out_channels, kernel_size=1),
-            nn.Sigmoid()
+            nn.Tanh()
         ]
 
         self.first = nn.Sequential(*layers)
