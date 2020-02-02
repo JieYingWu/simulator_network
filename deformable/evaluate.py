@@ -24,7 +24,7 @@ for i in range(len(mesh_files)):
     except:
         print("Can't find ", mesh_files[i])
         exit()
-    mesh = mesh.reshape(13, 5, 5, 3)
+    mesh = mesh.reshape(13, 5, 5, 3)#.permute(3,0,1,2)
 #    print(mesh[:,-1,:,1])
     mesh = mesh[:,-1,:,:]
 #    mesh = refine_mesh(mesh.unsqueeze(0), 3, device)

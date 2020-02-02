@@ -15,7 +15,7 @@ from torchsummary import summary
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-FEM_WEIGHT = 500
+FEM_WEIGHT = 1000
  
 if __name__ == '__main__':
     
@@ -54,8 +54,8 @@ if __name__ == '__main__':
     
     in_channels = 10
     out_channels = 3
-    batch_size = 1
-    lr = 1.0e-5
+    batch_size = 128
+    lr = 1.0e-7
     n_epochs = 500
     momentum=0.9
 
@@ -156,12 +156,12 @@ if __name__ == '__main__':
                 all_val_loss = []
                 with torch.no_grad():
 #                    model.eval()
-                    for j, (kinematics, mesh, label) in enumerate(val_loader):
-                        kinematics, mesh, label = kinematics.to(device), mesh.to(device), label.to(device)
+                    for j, (kinematics, mesh, label, mesh_next) in enumerate(val_loader):
+                        kinematics, mesh, label, mesh_next = kinematics.to(device), mesh.to(device), label.to(device), mesh_next.to(device)
                         mesh_kinematics = utils.concat_mesh_kinematics(mesh, kinematics)
                         pred = model(mesh_kinematics)
                         corrected = utils.correct(mesh, pred)
-                        loss = loss_fn(corrected, label, mesh)
+                        loss = loss_fn(corrected, label, mesh_next)
                         all_val_loss.append(loss.item())
 
                         if (j == 500):

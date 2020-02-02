@@ -1,5 +1,6 @@
 import sys
 import torch
+import torch.nn as nn
 import numpy as np
 from pathlib import Path
 sys.path.insert(0,'../processing/')
@@ -37,6 +38,10 @@ else:
     print('Failed to restore model')
     exit()
 
+for m in net.modules():
+  if isinstance(m, nn.BatchNorm3d):
+    m.eval()
+    
 ## Load kinematics ##
 robot_pos = np.genfromtxt('../../dataset/2019-10-09-GelPhantom1/dvrk/' + folder_name  + '_robot_cartesian_processed_interpolated.csv', delimiter=',')
 robot_pos = torch.from_numpy(robot_pos).float().to(device)

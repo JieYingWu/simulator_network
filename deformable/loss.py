@@ -24,7 +24,7 @@ class MeshLoss(nn.Module):
     def forward(self, network_mesh, pc, fem_mesh):
         # get probabilities from logits
         top = network_mesh[:,:,:,-1,:]
-        #bottom = network_mesh[:,:,:,0:-1,:]
+        bottom = network_mesh[:,:,:,0:-1,:]
         
         # Match the top, camera observed layer
 #        top = refine_mesh(top, 3, self.device)
@@ -62,10 +62,9 @@ class MeshLoss(nn.Module):
             exit()
 
         # Match the FEM layers
-        base_mesh = self.base_mesh.repeat(network_mesh.size()[0], 1, 1, 1, 1)
 #        print(base_mesh[0,2,:,1,:])
 #        print(network_mesh[0,2,:,1,:])
-        fem_loss = self.fem_loss_fn(network_mesh, base_mesh)
+        fem_loss = self.fem_loss_fn(bottom, fem_mesh[:,:,:,0:-1,:])
         # Only want pc -> mesh loss to ignore occluded regions
         loss = torch.mean(dist2) + fem_loss * self.weight# + torch.mean(dist1)
         #print(torch.mean(dist2), fem_loss)
