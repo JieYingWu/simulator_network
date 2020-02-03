@@ -43,8 +43,6 @@ def correct_cpu(mesh,x):
 def concat_mesh_kinematics(mesh, kinematics):
     kinematics = kinematics.view(kinematics.size()[0], kinematics.size()[1],1,1,1)
     kinematics = kinematics.repeat(1,1,mesh.size()[2],mesh.size()[3],mesh.size()[4])
-#    print(mesh.size())
-#    print(kinematics.size())
     return torch.cat((mesh, kinematics), axis=1)
 
 def reshape_volume(x):

@@ -71,7 +71,6 @@ if __name__ == '__main__':
     base_mesh = np.genfromtxt('../../dataset/2019-10-09-GelPhantom1/simulator/5e3_data/data0/position0001.txt')
     base_mesh = torch.from_numpy(base_mesh).float().to(device)
     base_mesh = base_mesh.reshape(13,5,5,3).permute(3,0,1,2).unsqueeze(0)
-    print(base_mesh.size())
 #    print(base_mesh[0,1,:,-1,:])
 
     loss_fn = MeshLoss(batch_size, FEM_WEIGHT, base_mesh, device)

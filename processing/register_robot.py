@@ -21,17 +21,21 @@ height_scale = 2
 #phantom_points = np.array([[34.35,17.9+height_scale,-19.65], [-34.35,17.9+height_scale,-19.65], [-34.35,17.9+height_scale,19.65], [34.35,17.9+height_scale,19.65]])
 #measured_points = np.array([[-0.0796385679491,0.0143042152692,-0.166926943272],[-0.027116819443,0.0448946184372,-0.16551352955],[-0.0426067612174,0.0737392043797,-0.164060336369],[-0.0952109779515,0.0467586154014,-0.161902662597]])*scale
 
-#### For 2019-09-07-GelPhantom1 calibration.bag####
+#### For 2019-09-07-GelPhantom1 calibration.bag ####
 #phantom_points = np.array([[34.35,17.9+height_scale,-19.65],[34.35,17.9+height_scale,19.65], [-34.35,17.9+height_scale,19.65], [-34.35,17.9+height_scale,-19.65]])
 #measured_points = np.array([[-0.0385508264048,0.0117059655192,-0.163761123466],[-0.0675615150341,0.0271352462875,-0.162144016254],[-0.0325210577463,0.077589122308,-0.163133003789],[-0.006050161735,0.058100#2839305,-0.163235763297]])*scale
 
-#### For 2019-09-07-GelPhantom1 calibration2.bag####
+#### For 2019-09-07-GelPhantom1 calibration2.bag ####
 #phantom_points = np.array([[34.35,17.9+height_scale,-19.65],[34.35,17.9+height_scale,19.65], [-34.35,17.9+height_scale,19.65], [-34.35,17.9+height_scale,-19.65]])
 #measured_points = np.array([[0.0109767365717,0.0325840775784,-0.170454264724],[-0.0185004046648,0.0223525773209,-0.168647028127],[-0.0364133953944,0.0777076526436,-0.162404311456],[-0.00742976914855,0.0867336555288,-0.165045580182]])*scale
 
-#### For 2019-09-07-GelPhantom1 calibration2.bag####
+#### For 2019-10-09-GelPhantom1 calibration.bag ####
 phantom_points = np.array([[34.35,17.9+height_scale,-19.65],[34.35,17.9+height_scale,19.65], [-34.35,17.9+height_scale,19.65], [-34.35,17.9+height_scale,-19.65]])
-measured_points = np.array([[-0.0107064810243,0.0138355962459,-0.162823084348],[-0.0370138538133,0.0612660975156,-0.161355184934],[-0.012526569462,0.0787072184199,-0.162244067229],[0.0180289560795,0.0278676994813,-0.166638892911]])*scale
+measured_points = np.array([[-0.0107039506018, 0.0138381164893, -0.162823036545],
+[-0.0370138538133, 0.0612660975156, -0.161355184934],
+[-0.0125252142385, 0.0787097317392, -0.162242952583],
+[0.0180315515559, 0.0278664050941, -0.166638828542]])*scale
+
 
 # Registers measured_points to phantom_points
 transform = cisstNumericalPython.nmrRegistrationRigid(measured_points, phantom_points)
@@ -40,6 +44,8 @@ q = R.from_dcm(transform.Rotation()).inv().as_quat()
 q_inv = R.from_dcm(transform.Rotation()).as_quat()
 transform = np.concatenate((transform.Rotation(), np.expand_dims(transform.Translation(), 1)), 1)
 transform = np.concatenate((transform, np.array([[0,0,0,1]])), 0)
+
+print (transform)
 
 data = np.genfromtxt(str(sys.argv[1]), delimiter=',')
 length = data.shape[0]-1 # First line is field names

@@ -65,7 +65,7 @@ for i in range(steps):
 #    print(network_correction[0,0,0])
 #    print(mesh[0,2,0,4,4])
     mesh = utils.correct(mesh, network_correction)
-#    print(mesh[0,2,:,-1,:])
+    #print(mesh[0,2,:,-1,:])
     write_out = mesh.clone().cpu().numpy().reshape(3,-1).transpose()
 
 #    write_out = correct(mesh, network_correction)
