@@ -19,9 +19,9 @@ class MeshLoss(nn.Module):
         self.chamfer = ChamferDistance()
         self.fem_loss_fn = nn.MSELoss()
         self.weight = weight
-        self.base_mesh = base_mesh
+        self.base_mesh = base_mesh.to(device)
 
-    def forward(self, network_mesh, pc, fem_mesh):
+    def forward(self, network_mesh, pc):
         # get probabilities from logits
         top = network_mesh[:,:,:,-1,:]
         bottom = network_mesh[:,:,:,0:-1,:]
@@ -32,6 +32,8 @@ class MeshLoss(nn.Module):
         
         pc = pc.permute(0,2,1).contiguous()
         top = top.permute(0,2,1).contiguous()
+#        print(top[0,0:10].detach().cpu().numpy())
+#        print(pc[0,0:10].detach().cpu().numpy())
 #        print('-------')
 #        print(top)
 #        print(pc)

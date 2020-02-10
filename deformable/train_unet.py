@@ -7,6 +7,10 @@ from dataset import SimulatorDataset3D
 from model import UNet3D, SimuNet
 from loss import MeshLoss
 
+import sys
+sys.path.insert(0,'../simulator/')
+from play_simulation import play_simulation
+
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
@@ -15,7 +19,7 @@ from torchsummary import summary
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-FEM_WEIGHT = 1000
+FEM_WEIGHT = 50
  
 if __name__ == '__main__':
     
@@ -30,8 +34,8 @@ if __name__ == '__main__':
     train_simulator_path = []
     train_label_path = []
     for v in train_set:
-        train_kinematics_path = train_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_processed_interpolated.csv']
-        train_simulator_path = train_simulator_path + [path+'/simulator/5e3_data/' + v + '/']
+        train_kinematics_path = train_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_velocity.csv']
+        train_simulator_path = train_simulator_path + [v + '/']
         train_label_path = train_label_path + [path+'/camera/' + v + '_filtered/']
 #    for v in train_set:
 #        train_kinematics_path = train_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_processed_interpolated.csv']
@@ -44,39 +48,41 @@ if __name__ == '__main__':
     val_simulator_path = []
     val_label_path = []
     for v in val_set:
-        val_kinematics_path = val_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_processed_interpolated.csv']
-        val_simulator_path = val_simulator_path + [path+'/simulator/5e3_data/' + v + '/']
+        val_kinematics_path = val_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_velocity.csv']
+        val_simulator_path = val_simulator_path + [v + '/']
         val_label_path = val_label_path + [path+'/camera/' + v + '_filtered/']
 
-    epoch_to_use = 7
-    use_previous_model = False
+    epoch_to_use = 10
+    use_previous_model = True
     validate_each = 5
     
-    in_channels = 10
-    out_channels = 3
     batch_size = 128
-    lr = 1.0e-7
+    lr = 1.0e-5
     n_epochs = 500
     momentum=0.9
 
-    train_dataset = SimulatorDataset3D(train_kinematics_path, train_simulator_path, train_label_path, augment=True)
+    base_mesh = np.genfromtxt('../../dataset/2019-10-09-GelPhantom1/simulator/5e3_data/data0/position0001.txt')
+    base_mesh = torch.from_numpy(base_mesh).float()
+    base_mesh = base_mesh.reshape(13,5,5,3).permute(3,0,1,2).unsqueeze(0)
+#    print(base_mesh[0,1,:,-1,:])
+
+    train_dataset = SimulatorDataset3D(train_kinematics_path, train_simulator_path, train_label_path, augment=False)
     val_dataset = SimulatorDataset3D(val_kinematics_path, val_simulator_path, val_label_path, augment=False)
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     
-    model = SimuNet(in_channels=in_channels, out_channels=out_channels, dropout=0.1).to(device)
+    model = UNet3D(in_channels=utils.IN_CHANNELS, out_channels=utils.OUT_CHANNELS, dropout=utils.DROPOUT).to(device)
 #    model = utils.init_net(model)
 #    summary(model, input_size=(3, img_size[0], img_size[1], img_size[2]))
 
-    base_mesh = np.genfromtxt('../../dataset/2019-10-09-GelPhantom1/simulator/5e3_data/data0/position0001.txt')
-    base_mesh = torch.from_numpy(base_mesh).float().to(device)
-    base_mesh = base_mesh.reshape(13,5,5,3).permute(3,0,1,2).unsqueeze(0)
-#    print(base_mesh[0,1,:,-1,:])
-
+    base_mesh = base_mesh.to(device)
     loss_fn = MeshLoss(batch_size, FEM_WEIGHT, base_mesh, device)
     optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum) 
     scheduler = ReduceLROnPlateau(optimizer)
 
+    train_kinematics = torch.from_numpy(np.genfromtxt(train_kinematics_path[0], delimiter=',')).float().to(device)
+    val_kinematics = torch.from_numpy(np.genfromtxt(train_kinematics_path[0], delimiter=',')).float().to(device)
+    
     try:
         model_root = root / "models"
         model_root.mkdir(mode=0o777, parents=False)
@@ -120,8 +126,6 @@ if __name__ == '__main__':
     
     try:    
         for e in range(epoch, n_epochs + 1):
-#            for param_group in optimizer.param_groups:
-#                print('Learning rate ', param_group['lr'])
         
             model.train()
 
@@ -130,13 +134,14 @@ if __name__ == '__main__':
             epoch_loss = 0
             train_dataset.__set_network__()
 
-            for i, (kinematics, mesh, label, mesh_next) in enumerate(train_loader):
-                kinematics, mesh, label, mesh_next = kinematics.to(device), mesh.to(device), label.to(device), mesh_next.to(device)
-
+            for i, (kinematics, mesh, label) in enumerate(train_loader):
+                kinematics, mesh, label  = kinematics.to(device), mesh.to(device), label.to(device)
                 mesh_kinematics = utils.concat_mesh_kinematics(mesh, kinematics)
+#                print(mesh_kinematics[0,:,5,3,3])
+#                print(mesh_kinematics[0,:,5,2,3])
                 pred = model(mesh_kinematics)
                 corrected = utils.correct(mesh, pred)
-                loss = loss_fn(corrected, label, mesh_next)
+                loss = loss_fn(corrected, label)
                 epoch_loss += loss.item()
 
                 optimizer.zero_grad()
@@ -147,20 +152,20 @@ if __name__ == '__main__':
                 tq.set_postfix(loss=' loss={:.5f}'.format(mean_loss))
                 step += 1
 
-            model_path = "augmentation_model.pt"
-            save(e, model, model_path, mean_loss, optimizer, scheduler)
-
+#            model_path = "augmentation_model.pt"
+#            save(e, model, model_path, mean_loss, optimizer, scheduler)
+            play_simulation(model, base_mesh, train_kinematics, train_set[0])
+            
             if e % validate_each == 0:
                 torch.cuda.empty_cache()
                 all_val_loss = []
                 with torch.no_grad():
-#                    model.eval()
-                    for j, (kinematics, mesh, label, mesh_next) in enumerate(val_loader):
-                        kinematics, mesh, label, mesh_next = kinematics.to(device), mesh.to(device), label.to(device), mesh_next.to(device)
+                    for j, (kinematics, mesh, label) in enumerate(val_loader):
+                        kinematics, mesh, label  = kinematics.to(device), mesh.to(device), label.to(device)
                         mesh_kinematics = utils.concat_mesh_kinematics(mesh, kinematics)
                         pred = model(mesh_kinematics)
                         corrected = utils.correct(mesh, pred)
-                        loss = loss_fn(corrected, label, mesh_next)
+                        loss = loss_fn(corrected, label)
                         all_val_loss.append(loss.item())
 
                         if (j == 500):
@@ -171,7 +176,9 @@ if __name__ == '__main__':
                             np.save(str(results_root/'mesh_{e}'.format(e=e)), mesh_plot)
                             np.save(str(results_root/'label_{e}'.format(e=e)), label_plot)
 
-                        
+                    
+                    play_simulation(model, base_mesh, val_kinematics, val_set[0])
+
                 mean_loss = np.mean(all_val_loss)
                 tq.set_postfix(loss='validation loss={:5f}'.format(mean_loss))
                 scheduler.step(mean_loss)

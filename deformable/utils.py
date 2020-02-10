@@ -3,6 +3,10 @@ import torch
 from torch import nn
 from datetime import datetime
 
+IN_CHANNELS = 13
+OUT_CHANNELS = 3
+DROPOUT = 0.1
+FIELDS = 10
 
 def init_net(net, type="kaiming", mode="fan_in", activation_mode="relu", distribution="normal"):
     assert (torch.cuda.is_available())

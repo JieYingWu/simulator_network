@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 
 class SimuNet(nn.Module):
-    def __init__(self, in_channels, out_channels, conv_depth= (32,64,128), dropout=False):
+    def __init__(self, in_channels, out_channels, conv_depth= (64,128,256,512,512), dropout=False):
 
         super(SimuNet, self).__init__()
         
@@ -23,10 +23,18 @@ class SimuNet(nn.Module):
             nn.BatchNorm3d(conv_depth[2]),
             nn.ReLU(inplace=True),
             nn.Dropout3d(p=dropout),
-            nn.Conv3d(conv_depth[2], out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm3d(out_channels),
+            nn.Conv3d(conv_depth[2], conv_depth[3], kernel_size=3, padding=1),
+            nn.BatchNorm3d(conv_depth[3]),
             nn.ReLU(inplace=True),
             nn.Dropout3d(p=dropout),
+            nn.Conv3d(conv_depth[3], conv_depth[4], kernel_size=3, padding=1),
+            nn.BatchNorm3d(conv_depth[4]),
+            nn.ReLU(inplace=True),
+            nn.Dropout3d(p=dropout),
+            nn.Conv3d(conv_depth[4], out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm3d(out_channels),
+            nn.ReLU(inplace=True),
+            #nn.Dropout3d(p=dropout),
             nn.Conv3d(out_channels, out_channels, kernel_size=3, padding=1),
             nn.Tanh()
         ]
@@ -198,11 +206,11 @@ class Last3D(nn.Module):
             nn.Conv3d(in_channels, middle_channels, kernel_size=3, padding=1),
             nn.BatchNorm3d(middle_channels),
             nn.ReLU(inplace=True),
-            nn.Dropout3d(p=dropout),
+            #nn.Dropout3d(p=dropout),
             nn.Conv3d(middle_channels, middle_channels, kernel_size=3, padding=1),
             nn.BatchNorm3d(middle_channels),
             nn.ReLU(inplace=True),
-            nn.Dropout3d(p=dropout),
+            #nn.Dropout3d(p=dropout),
             nn.Conv3d(middle_channels, out_channels, kernel_size=1),
 #            nn.Conv3d(in_channels, out_channels, kernel_size=1),
             nn.Tanh()
