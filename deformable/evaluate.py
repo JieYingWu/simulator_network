@@ -3,7 +3,7 @@ import sys
 import torch
 import plyfile
 import numpy as np
-from utils import refine_mesh
+import utils
 from chamferdist.chamferdist import ChamferDistance
 
 mesh_path = sys.argv[1]
@@ -16,15 +16,16 @@ gt_files = sorted(os.listdir(gt_path))
 loss = 0
 loss_fn = ChamferDistance()
 
-for i in range(300):#len(mesh_files)/6):
+#print('Using base mesh')
+for i in range(len(mesh_files)):
     try:
-        mesh = np.genfromtxt(mesh_path + mesh_files[0])
+        mesh = np.genfromtxt(mesh_path + mesh_files[i])
 #        mesh = np.genfromtxt(mesh_path + mesh_files[0])
         mesh = torch.from_numpy(mesh)
     except:
         print("Can't find ", mesh_files[i])
         exit()
-    mesh = mesh.reshape(13, 5, 5, 3)#.permute(3,0,1,2)
+    mesh = mesh.reshape(utils.VOL_SIZE)#.permute(3,0,1,2)
 #    print(mesh[:,-1,:,1])
     mesh = mesh[:,-1,:,:]
 #    mesh = refine_mesh(mesh.unsqueeze(0), 3, device)

@@ -7,6 +7,7 @@ IN_CHANNELS = 13
 OUT_CHANNELS = 3
 DROPOUT = 0.1
 FIELDS = 10
+VOL_SIZE = (23,12,13,3)
 
 def init_net(net, type="kaiming", mode="fan_in", activation_mode="relu", distribution="normal"):
     assert (torch.cuda.is_available())
@@ -46,11 +47,13 @@ def correct_cpu(mesh,x):
 
 def concat_mesh_kinematics(mesh, kinematics):
     kinematics = kinematics.view(kinematics.size()[0], kinematics.size()[1],1,1,1)
-    kinematics = kinematics.repeat(1,1,mesh.size()[2],mesh.size()[3],mesh.size()[4])
+    # Just puttingit on the top
+    kinematics = kinematics.repeat(1,1,mesh.size()[2],1,mesh.size()[4])
+    kinematics = torch.cat((torch.zeros((kinematics.size()[0], kinematics.size()[1], mesh.size()[2], mesh.size()[3]-1, mesh.size()[4]), device=mesh.device), kinematics), axis=3)
     return torch.cat((mesh, kinematics), axis=1)
 
 def reshape_volume(x):
-    y = x.reshape(13, 5, 5, 3)
+    y = x.reshape(VOL_SIZE)
     y = y.transpose((3, 0, 1, 2))        
     return y
 

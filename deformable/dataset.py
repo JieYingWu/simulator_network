@@ -55,7 +55,7 @@ class SimulatorDataset3D(Dataset):
             self.net = False
             
     def __len__(self):
-        return 300#len(self.simulator_array)-1
+        return len(self.label_array)-1
 
     def add_model_noise(self, idx, steps):
         if idx < steps:

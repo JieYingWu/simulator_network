@@ -19,17 +19,17 @@ from torchsummary import summary
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-FEM_WEIGHT = 50
+FEM_WEIGHT = 1
  
 if __name__ == '__main__':
     
     root = Path("checkpoints")
-    num_workers = 4
+    num_workers = 1
     train_set = ['data6']# 'data3', 'data4', 'data5',  'data6', 'data7', 'data8', 'data9', 'data10', 'data11']
     val_set = ['data4']# 'data0']
     # Testing on data1 and 2
     
-    path = '../../dataset/2019-10-09-GelPhantom1'
+    path = '../../dataset/2019-10-09-reduced'
     train_kinematics_path = []
     train_simulator_path = []
     train_label_path = []
@@ -52,18 +52,18 @@ if __name__ == '__main__':
         val_simulator_path = val_simulator_path + [v + '/']
         val_label_path = val_label_path + [path+'/camera/' + v + '_filtered/']
 
-    epoch_to_use = 10
-    use_previous_model = True
+    epoch_to_use = 480
+    use_previous_model = False
     validate_each = 5
     
-    batch_size = 128
+    batch_size = 64
     lr = 1.0e-5
     n_epochs = 500
     momentum=0.9
 
-    base_mesh = np.genfromtxt('../../dataset/2019-10-09-GelPhantom1/simulator/5e3_data/data0/position0001.txt')
+    base_mesh = np.genfromtxt('data6/position0000.txt')
     base_mesh = torch.from_numpy(base_mesh).float()
-    base_mesh = base_mesh.reshape(13,5,5,3).permute(3,0,1,2).unsqueeze(0)
+    base_mesh = base_mesh.reshape(utils.VOL_SIZE).permute(3,0,1,2).unsqueeze(0)
 #    print(base_mesh[0,1,:,-1,:])
 
     train_dataset = SimulatorDataset3D(train_kinematics_path, train_simulator_path, train_label_path, augment=False)
@@ -137,6 +137,8 @@ if __name__ == '__main__':
             for i, (kinematics, mesh, label) in enumerate(train_loader):
                 kinematics, mesh, label  = kinematics.to(device), mesh.to(device), label.to(device)
                 mesh_kinematics = utils.concat_mesh_kinematics(mesh, kinematics)
+#                print(mesh_kinematics.size())
+#                print(mesh_kinematics[5,:,0,0,0], mesh_kinematics[5,:,-1,-1,-1])
 #                print(mesh_kinematics[0,:,5,3,3])
 #                print(mesh_kinematics[0,:,5,2,3])
                 pred = model(mesh_kinematics)

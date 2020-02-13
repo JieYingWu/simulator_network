@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 
 class SimuNet(nn.Module):
-    def __init__(self, in_channels, out_channels, conv_depth= (64,128,256,512,512), dropout=False):
+    def __init__(self, in_channels, out_channels, conv_depth= (256,256,256,512,512), dropout=False):
 
         super(SimuNet, self).__init__()
         
