@@ -4,6 +4,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+#class SimuNetWithSurface(nn.Module):
+#    def __init__(self, in_channels, out_channels, conv_depth=(256,256,512,512), dropout=False):
+#        pc_layers = 
+#        
+#        layers = [
+
 
 class SimuNet(nn.Module):
     def __init__(self, in_channels, out_channels, conv_depth= (256,256,256,512,512), dropout=False):

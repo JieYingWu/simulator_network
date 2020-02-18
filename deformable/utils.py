@@ -7,7 +7,7 @@ IN_CHANNELS = 13
 OUT_CHANNELS = 3
 DROPOUT = 0.1
 FIELDS = 10
-VOL_SIZE = (23,12,13,3)
+VOL_SIZE = (13,5,5,3)
 
 def init_net(net, type="kaiming", mode="fan_in", activation_mode="relu", distribution="normal"):
     assert (torch.cuda.is_available())

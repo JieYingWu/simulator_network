@@ -2,7 +2,8 @@ import sys
 import numpy as np
 
 dim = np.array([68.7, 35.8, 39.3])
-nodes = np.array([23,12,13])
+#nodes = np.array([23,12,13])
+nodes = np.array([13,5,5])
 step = dim/nodes
 
 vol = np.zeros((nodes[0]*nodes[1]*nodes[2], 3))

@@ -28,6 +28,12 @@ def play_simulation(net, mesh, robot_pos, folder_name):
     for i in range(steps):
         cur_pos = robot_pos[i,1:1+utils.FIELDS].unsqueeze(0)
         mesh_kinematics = utils.concat_mesh_kinematics(mesh, cur_pos)
+#        print(mesh_kinematics[0,:,1,1,1])
+#        print(mesh_kinematics[0,:,2,2,2])
+#        print(mesh_kinematics[0,:,1,-1,1])
+#        print(mesh_kinematics[0,:,0,-1,1])        
+#        print(mesh_kinematics[0,:,2,-1,1])
+#        exit()
         correction = net(mesh_kinematics)
         for j in range(ensemble_size):
             update = net(mesh_kinematics)

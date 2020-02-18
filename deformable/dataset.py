@@ -27,9 +27,9 @@ class SimulatorDataset3D(Dataset):
         self.kinematics_array = None
         for path in kinematics_path:
             if self.kinematics_array is None:
-                self.kinematics_array = np.genfromtxt(path, delimiter=',')
+                self.kinematics_array = np.genfromtxt(path, delimiter=',')[:,0:utils.FIELDS+1]
             else:
-                self.kinematics_array = np.concatenate((self.kinematics_array, np.genfromtxt(path, delimiter=',')))
+                self.kinematics_array = np.concatenate((self.kinematics_array, np.genfromtxt(path, delimiter=',')[:,0:utils.FIELDS+1]))
         self.kinematics_array = torch.from_numpy(self.kinematics_array).float()
                 
         self.simulator_array = []
@@ -93,9 +93,9 @@ class SimulatorDataset3D(Dataset):
         random.shuffle(indices)
         pc = pc[indices[0:self.pc_length], :]
         pc = np.transpose(pc, (1,0))
-#        simulation_next = torch.from_numpy(utils.reshape_volume(np.genfromtxt(self.simulator_array[idx+1]))).float()
+        simulation_next = torch.from_numpy(utils.reshape_volume(np.genfromtxt(self.simulator_array[idx+1]))).float()
 
-        return kinematics, simulation, torch.from_numpy(pc).float()#, simulation_next
+        return kinematics, simulation, torch.from_numpy(pc).float(), simulation_next
 
     
 class SimulatorDataset2D(Dataset):
