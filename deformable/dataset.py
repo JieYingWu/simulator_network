@@ -21,7 +21,7 @@ def add_gaussian_noise(mesh):
     return mesh + modifier#, kinematics + kn_noise
     
 class SimulatorDataset3D(Dataset):
-    def __init__(self, kinematics_path, simulator_path, label_path, augment=False, pc_length=27000):
+    def __init__(self, kinematics_path, simulator_path, label_path, fem_path, augment=False, pc_length=27000):
         self.pc_length = pc_length
         self.augment= augment
         self.kinematics_array = None
@@ -42,6 +42,11 @@ class SimulatorDataset3D(Dataset):
             files = sorted(os.listdir(path))
             self.label_array = self.label_array + [path + x for x in files]
             
+        self.fem_array = []
+        for path in fem_path:
+            files = sorted(os.listdir(path))
+            self.fem_array = self.fem_array + [path + x for x in files]
+
     def __set_network__(self):
         network_path = Path('augmentation_model.pt')
         self.net = SimuNet(in_channels=utils.IN_CHANNELS, out_channels=utils.OUT_CHANNELS, dropout=utils.DROPOUT)
@@ -93,9 +98,9 @@ class SimulatorDataset3D(Dataset):
         random.shuffle(indices)
         pc = pc[indices[0:self.pc_length], :]
         pc = np.transpose(pc, (1,0))
-        simulation_next = torch.from_numpy(utils.reshape_volume(np.genfromtxt(self.simulator_array[idx+1]))).float()
+        fem = torch.from_numpy(utils.reshape_volume(np.genfromtxt(self.fem_array[idx+1]))).float()
 
-        return kinematics, simulation, torch.from_numpy(pc).float(), simulation_next
+        return kinematics, simulation, torch.from_numpy(pc).float(), fem
 
     
 class SimulatorDataset2D(Dataset):

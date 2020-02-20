@@ -19,7 +19,7 @@ from torchsummary import summary
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-FEM_WEIGHT = 200
+FEM_WEIGHT = 1
  
 if __name__ == '__main__':
     
@@ -35,13 +35,9 @@ if __name__ == '__main__':
     train_label_path = []
     for v in train_set:
         train_kinematics_path = train_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_velocity.csv']
-        train_simulator_path = train_simulator_path + [path+'/simulator/5e3_data/' + v + '/']
+        train_simulator_path = train_simulator_path + [v + '/']
         train_label_path = train_label_path + [path+'/camera/' + v + '_filtered/']
-#    for v in train_set:
-#        train_kinematics_path = train_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_processed_interpolated.csv']
-#        train_simulator_path = train_simulator_path + [path+'/simulator/5e3_data/' + v + '_net/']
-#        train_label_path = train_label_path + [path+'/camera/' + v + '_filtered/']
-
+        train_fem_path = train_simulator_path + [path+'/simulator/5e3_data/' + v + '/']
 
     print(train_kinematics_path)
     val_kinematics_path = []
@@ -51,28 +47,30 @@ if __name__ == '__main__':
         val_kinematics_path = val_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_velocity.csv']
         val_simulator_path = val_simulator_path + [v + '/']
         val_label_path = val_label_path + [path+'/camera/' + v + '_filtered/']
+        val_fem_path = train_simulator_path + [path+'/simulator/5e3_data/' + v + '/']
 
-    epoch_to_use = 70
-    use_previous_model = True
+    epoch_to_use = 5
+    use_previous_model = False
     validate_each = 5
+    play_each = 10
     
     batch_size = 64
-    lr = 1.0e-5
+    lr = 1.0e-4
     n_epochs = 500
     momentum=0.9
 
     base_mesh = np.genfromtxt('data6/position0000.txt')
     base_mesh = torch.from_numpy(base_mesh).float()
     base_mesh = base_mesh.reshape(utils.VOL_SIZE).permute(3,0,1,2).unsqueeze(0)
-#    print(base_mesh[0,1,:,-1,:])
 
-    train_dataset = SimulatorDataset3D(train_kinematics_path, train_simulator_path, train_label_path, augment=False)
-    val_dataset = SimulatorDataset3D(val_kinematics_path, val_simulator_path, val_label_path, augment=False)
+    train_dataset = SimulatorDataset3D(train_kinematics_path, train_simulator_path, train_label_path, train_fem_path, augment=False)
+    val_dataset = SimulatorDataset3D(val_kinematics_path, val_simulator_path, val_label_path, val_fem_path, augment=False)
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     
-    model = SimuNet(in_channels=utils.IN_CHANNELS, out_channels=utils.OUT_CHANNELS, dropout=utils.DROPOUT).to(device)
-#    model = utils.init_net(model)
+    model = UNet3D(in_channels=utils.IN_CHANNELS, out_channels=utils.OUT_CHANNELS, dropout=utils.DROPOUT).to(device)
+    if not use_previous_model:
+        model = utils.init_net(model)
 #    summary(model, input_size=(3, img_size[0], img_size[1], img_size[2]))
 
     base_mesh = base_mesh.to(device)
@@ -120,6 +118,8 @@ if __name__ == '__main__':
         'optimizer': optimizer.state_dict(),
         'scheduler': scheduler.state_dict()
     }, str(model_path))
+
+    print('In train_unet.py, not using any Chamfer Loss')
     
     try:    
         for e in range(epoch, n_epochs + 1):
@@ -133,13 +133,9 @@ if __name__ == '__main__':
 
             for i, (kinematics, mesh, label, fem) in enumerate(train_loader):
                 kinematics, mesh, label, fem  = kinematics.to(device), mesh.to(device), label.to(device), fem.to(device)
-                mesh_kinematics = utils.concat_mesh_kinematics(mesh, kinematics)
-#                print(mesh_kinematics.size())
-#                print(mesh_kinematics[5,:,0,0,0], mesh_kinematics[5,:,-1,-1,-1])
-#                print(mesh_kinematics[0,:,5,3,3])
-#                print(mesh_kinematics[0,:,5,2,3])
-#                print(fem.size())
-                pred = model(mesh_kinematics)
+#                mesh_kinematics = utils.concat_mesh_kinematics(mesh, kinematics)
+
+                pred = model(mesh, label, kinematics)
                 corrected = utils.correct(mesh, pred)
                 loss = loss_fn(corrected, label, fem)
                 epoch_loss += loss.item()
@@ -152,11 +148,10 @@ if __name__ == '__main__':
                 tq.set_postfix(loss=' loss={:.5f}'.format(mean_loss))
                 step += 1
 
-#            model_path = "augmentation_model.pt"
-#            save(e, model, model_path, mean_loss, optimizer, scheduler)
-            for idx in range(len(train_set)):
-                kinematics = torch.from_numpy(np.genfromtxt(train_kinematics_path[idx], delimiter=',')).float().to(device)
-                play_simulation(model, base_mesh, kinematics, train_set[idx])
+            if e % play_each == 0:
+                for idx in range(len(train_set)):
+                    kinematics = torch.from_numpy(np.genfromtxt(train_kinematics_path[idx], delimiter=',')).float().to(device)
+                    play_simulation(model, base_mesh, kinematics, train_set[idx])
             
             if e % validate_each == 0:
                 torch.cuda.empty_cache()
@@ -164,8 +159,8 @@ if __name__ == '__main__':
                 with torch.no_grad():
                     for j, (kinematics, mesh, label, fem) in enumerate(val_loader):
                         kinematics, mesh, label, fem  = kinematics.to(device), mesh.to(device), label.to(device), fem.to(device)
-                        mesh_kinematics = utils.concat_mesh_kinematics(mesh, kinematics)
-                        pred = model(mesh_kinematics)
+#                        mesh_kinematics = utils.concat_mesh_kinematics(mesh, kinematics)
+                        pred = model(mesh, label, kinematics)
                         corrected = utils.correct(mesh, pred)
                         loss = loss_fn(corrected, label, fem)
                         all_val_loss.append(loss.item())

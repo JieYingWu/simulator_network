@@ -1,14 +1,78 @@
-# modified from https://github.com/cosmic-cortex/pytorch-UNet
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-#class SimuNetWithSurface(nn.Module):
-#    def __init__(self, in_channels, out_channels, conv_depth=(256,256,512,512), dropout=False):
-#        pc_layers = 
-#        
-#        layers = [
+#https://github.com/fxia22/pointnet.pytorch
+class PointNetfeat(nn.Module):
+    def __init__(self, conv_depth=(64,128,256)):
+        super(PointNetfeat, self).__init__()
+        self.conv1 = torch.nn.Conv1d(3, conv_depth[0], 1)
+        self.conv2 = torch.nn.Conv1d(conv_depth[0], conv_depth[1], 1)
+        self.conv3 = torch.nn.Conv1d(conv_depth[1], conv_depth[2], 1)
+        self.bn1 = nn.BatchNorm1d(conv_depth[0])
+        self.bn2 = nn.BatchNorm1d(conv_depth[1])
+        self.bn3 = nn.BatchNorm1d(conv_depth[2])
+
+    def forward(self, x):
+        n_pts = x.size()[2]
+        x = F.relu(self.bn1(self.conv1(x)))
+
+        pointfeat = x
+        x = F.relu(self.bn2(self.conv2(x)))
+        x = self.bn3(self.conv3(x))
+        x = torch.max(x, 2, keepdim=True)[0]
+        x = x.view(-1, conv_depth[2])
+        return x
+        
+class SimuNetWithSurface(nn.Module):
+    def __init__(self, in_channels, out_channels, conv_depth=(64, 128, 256), dropout=False):
+        assert len(conv_depths) > 2, 'conv_depths must have at least 3 members'
+
+        super(SimuNetWithSurface, self).__init__()
+
+        self.pc_layers = PointNetfeat()
+        
+        # defining encoder layers
+        encoder_layers = []
+        encoder_layers.append(First3D(in_channels, conv_depths[0], conv_depths[0], dropout=dropout))
+        encoder_layers.extend([Encoder3D(conv_depths[i], conv_depths[i + 1], conv_depths[i + 1], dropout=dropout)
+                               for i in range(len(conv_depths)-2)])
+
+        # defining decoder layers
+        decoder_layers = []
+        decoder_layers.extend([Decoder3D(2 * conv_depths[i + 1], 2 * conv_depths[i], 2 * conv_depths[i], conv_depths[i], dropout=dropout)
+                               for i in reversed(range(len(conv_depths)-2))])
+        decoder_layers.append(Last3D(conv_depths[1], conv_depths[0], out_channels, dropout=dropout))
+
+        # encoder, center and decoder layers
+        self.encoder_layers = nn.Sequential(*encoder_layers)
+        self.center = Center3D(conv_depths[-2]+256+10, conv_depths[-1]+128, conv_depths[-1], conv_depths[-2], dropout=dropout)
+        self.decoder_layers = nn.Sequential(*decoder_layers)
+
+    def forward(self, x, pc, kinematics, return_all=False):
+        x_enc = [x]
+        for enc_layer in self.encoder_layers:
+            x_enc.append(enc_layer(x_enc[-1]))
+
+        pc_feat = self.pc_layers(pc)
+        features = torch.cat((pc_feat, kinematics), axis=1).unsqueeze(2).unsqueeze(3).unsqueeze(4)
+        features = torch.repeat(1, 1, x_enc[-1].size()[2], x_enc[-1].size()[3], x_enc[-1].size()[4])
+        
+        x_centre = torch.cat((x_enc, features), axis=1)
+
+        x_dec = [self.center(x_centre)]
+        for dec_layer_idx, dec_layer in enumerate(self.decoder_layers):
+            x_opposite = x_enc[-1-dec_layer_idx]
+            x_cat = torch.cat(
+                [pad_to_shape(x_dec[-1], x_opposite.shape), x_opposite],
+                dim=1
+            )
+            x_dec.append(dec_layer(x_cat))
+
+        if not return_all:
+            return x_dec[-1]
+        else:
+            return x_enc + x_dec
 
 
 class SimuNet(nn.Module):
@@ -40,7 +104,6 @@ class SimuNet(nn.Module):
             nn.Conv3d(conv_depth[4], out_channels, kernel_size=3, padding=1),
             nn.BatchNorm3d(out_channels),
             nn.ReLU(inplace=True),
-            #nn.Dropout3d(p=dropout),
             nn.Conv3d(out_channels, out_channels, kernel_size=3, padding=1),
             nn.Tanh()
         ]
@@ -50,7 +113,7 @@ class SimuNet(nn.Module):
     def forward(self, x):
         return self.layers(x)
         
-
+# modified from https://github.com/cosmic-cortex/pytorch-UNet
 class UNet3D(nn.Module):
     def __init__(self, in_channels, out_channels, conv_depths=(64, 128, 256), dropout=False):#, 512, 1024)):
         assert len(conv_depths) > 2, 'conv_depths must have at least 3 members'

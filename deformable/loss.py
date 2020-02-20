@@ -37,7 +37,7 @@ class MeshLoss(nn.Module):
 #        print('-------')
 #        print(top)
 #        print(pc)
-        dist1, dist2, idx1, idx2 = self.chamfer(top, pc)
+        #dist1, dist2, idx1, idx2 = self.chamfer(top, pc)
 
         if False:
             num = 10
@@ -68,9 +68,9 @@ class MeshLoss(nn.Module):
 #        base_mesh = self.base_mesh.repeat((network_mesh.size()[0], 1, 1, 1, 1))
 #        print(base_mesh[0,2,:,1,:])
 #        print(network_mesh[0,2,:,1,:])
-        fem_loss = self.fem_loss_fn(network_mesh, fem_mesh[:,:,:,:])
+        fem_loss = self.fem_loss_fn(network_mesh, fem_mesh)
         # Only want pc -> mesh loss to ignore occluded regions
-        loss = torch.mean(dist2) + fem_loss * self.weight# + torch.mean(dist1)
+        loss = fem_loss#torch.mean(dist2) + fem_loss * self.weight# + torch.mean(dist1)
 #        print(torch.mean(dist2), fem_loss)
         # Average the Dice score across all channels/classes
         return loss

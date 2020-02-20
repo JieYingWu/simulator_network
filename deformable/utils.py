@@ -18,7 +18,6 @@ def init_net(net, type="kaiming", mode="fan_in", activation_mode="relu", distrib
 def kaiming_weight_zero_bias(model, mode="fan_in", activation_mode="relu", distribution="uniform"):
     for module in model.modules():
         if hasattr(module, 'weight'):
-            print(module.weight)
             if not ('BatchNorm' in module.__class__.__name__):
                 if distribution == "uniform":
                     nn.init.kaiming_uniform_(module.weight, mode=mode, nonlinearity=activation_mode)
@@ -47,9 +46,10 @@ def correct_cpu(mesh,x):
 
 def concat_mesh_kinematics(mesh, kinematics):
     kinematics = kinematics.view(kinematics.size()[0], kinematics.size()[1],1,1,1)
-    # Just puttingit on the top
+    # Just putting it on the top of the mesh
     kinematics = kinematics.repeat(1,1,mesh.size()[2],1,mesh.size()[4])
-    kinematics = torch.cat((torch.zeros((kinematics.size()[0], kinematics.size()[1], mesh.size()[2], mesh.size()[3]-1, mesh.size()[4]), device=mesh.device), kinematics), axis=3)
+    zeros = torch.zeros((kinematics.size()[0], kinematics.size()[1], mesh.size()[2], mesh.size()[3]-1, mesh.size()[4]), device=mesh.device)
+    kinematics = torch.cat((zeros, kinematics), axis=3)
     return torch.cat((mesh, kinematics), axis=1)
 
 def reshape_volume(x):
