@@ -1,3 +1,4 @@
+import os
 import sys
 import torch
 import torch.nn as nn
@@ -7,7 +8,9 @@ sys.path.insert(0,'../processing/')
 sys.path.insert(0,'../deformable/')
 import utils
 import geometry_util as geo
-from model import UNet3D, SimuNet
+from model import UNet3D, SimuNet, SimuNetWithSurface
+import random
+import plyfile
 
 import gc
 
@@ -15,7 +18,7 @@ all_time_steps = [0.0332, 0.0332, 0.0329, 0.0332, 0.0332, 0.0333, 0.0331, 0.0332
 
 device = torch.device('cuda') 
 ensemble_size = 20
-
+pc_length = 27000
 #for m in net.modules():
 #  if isinstance(m, nn.BatchNorm3d):
 #    m.eval()
@@ -23,20 +26,31 @@ ensemble_size = 20
 
 def play_simulation(net, mesh, robot_pos, folder_name):
     steps = robot_pos.size()[0]
+
+    path = '../../dataset/2019-10-09-reduced/camera/' + folder_name + '_filtered/' 
+    files = sorted(os.listdir(path))
     
     ## Run ##
     for i in range(steps):
+        # Next point cloud
+        pc = plyfile.PlyData.read(path+files[i])['vertex']
+        pc = np.concatenate((np.expand_dims(pc['x'], 1), np.expand_dims(pc['y'],1), np.expand_dims(pc['z'],1)), 1)
+        indices = range(pc.shape[0])
+        random.shuffle(indices)
+        pc = pc[indices[0:pc_length], :]
+        pc = torch.from_numpy(np.transpose(pc, (1,0))).float().to(device).unsqueeze(0)
+        
         cur_pos = robot_pos[i,1:1+utils.FIELDS].unsqueeze(0)
-        mesh_kinematics = utils.concat_mesh_kinematics(mesh, cur_pos)
+#        mesh_kinematics = utils.concat_mesh_kinematics(mesh, cur_pos)
 #        print(mesh_kinematics[0,:,1,1,1])
 #        print(mesh_kinematics[0,:,2,2,2])
 #        print(mesh_kinematics[0,:,1,-1,1])
 #        print(mesh_kinematics[0,:,0,-1,1])        
 #        print(mesh_kinematics[0,:,2,-1,1])
 #        exit()
-        correction = net(mesh_kinematics)
+        correction = net(mesh, pc, cur_pos)
         for j in range(ensemble_size):
-            update = net(mesh_kinematics)
+            update = net(mesh, pc, cur_pos)
 #        print(update[0,1,:,-1,:])
             correction = correction + update
 #    exit()
@@ -63,7 +77,7 @@ if __name__ == "__main__":
         print('Too many arguments')
         exit()
     
-    net = SimuNet(in_channels=utils.IN_CHANNELS, out_channels=utils.OUT_CHANNELS, dropout=utils.DROPOUT)
+    net = SimuNetWithSurface(in_channels=utils.IN_CHANNELS, out_channels=utils.OUT_CHANNELS, dropout=utils.DROPOUT)
     # Load previous model if requested
     if network_path.exists():
         state = torch.load(str(network_path))
@@ -72,7 +86,8 @@ if __name__ == "__main__":
         print('Restored model')
     else:
         print('Failed to restore model')
-        exit()
+#        exit()
+        net = net.to(device)
 
 
     ## Load mesh ##

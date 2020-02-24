@@ -6,6 +6,7 @@ import torch.nn.functional as F
 class PointNetfeat(nn.Module):
     def __init__(self, conv_depth=(64,128,256)):
         super(PointNetfeat, self).__init__()
+        self.conv_depth = conv_depth
         self.conv1 = torch.nn.Conv1d(3, conv_depth[0], 1)
         self.conv2 = torch.nn.Conv1d(conv_depth[0], conv_depth[1], 1)
         self.conv3 = torch.nn.Conv1d(conv_depth[1], conv_depth[2], 1)
@@ -21,11 +22,11 @@ class PointNetfeat(nn.Module):
         x = F.relu(self.bn2(self.conv2(x)))
         x = self.bn3(self.conv3(x))
         x = torch.max(x, 2, keepdim=True)[0]
-        x = x.view(-1, conv_depth[2])
+        x = x.view(-1, self.conv_depth[2])
         return x
         
 class SimuNetWithSurface(nn.Module):
-    def __init__(self, in_channels, out_channels, conv_depth=(64, 128, 256), dropout=False):
+    def __init__(self, in_channels, out_channels, conv_depths=(64, 128, 256), dropout=False):
         assert len(conv_depths) > 2, 'conv_depths must have at least 3 members'
 
         super(SimuNetWithSurface, self).__init__()
@@ -49,16 +50,16 @@ class SimuNetWithSurface(nn.Module):
         self.center = Center3D(conv_depths[-2]+256+10, conv_depths[-1]+128, conv_depths[-1], conv_depths[-2], dropout=dropout)
         self.decoder_layers = nn.Sequential(*decoder_layers)
 
-    def forward(self, x, pc, kinematics, return_all=False):
+    def forward(self, x, pc, kinematics):
         x_enc = [x]
         for enc_layer in self.encoder_layers:
             x_enc.append(enc_layer(x_enc[-1]))
 
         pc_feat = self.pc_layers(pc)
         features = torch.cat((pc_feat, kinematics), axis=1).unsqueeze(2).unsqueeze(3).unsqueeze(4)
-        features = torch.repeat(1, 1, x_enc[-1].size()[2], x_enc[-1].size()[3], x_enc[-1].size()[4])
+        features = features.repeat(1, 1, x_enc[-1].size()[2], x_enc[-1].size()[3], x_enc[-1].size()[4])
         
-        x_centre = torch.cat((x_enc, features), axis=1)
+        x_centre = torch.cat((x_enc[-1], features), axis=1)
 
         x_dec = [self.center(x_centre)]
         for dec_layer_idx, dec_layer in enumerate(self.decoder_layers):
@@ -69,10 +70,7 @@ class SimuNetWithSurface(nn.Module):
             )
             x_dec.append(dec_layer(x_cat))
 
-        if not return_all:
-            return x_dec[-1]
-        else:
-            return x_enc + x_dec
+        return x_dec[-1]
 
 
 class SimuNet(nn.Module):
@@ -227,6 +225,18 @@ class Center3D(nn.Module):
         layers = [
             nn.MaxPool3d(kernel_size=2),
             nn.Conv3d(in_channels, middle_channels, kernel_size=3, padding=1),
+            nn.BatchNorm3d(middle_channels),
+            nn.ReLU(inplace=True),
+            nn.Dropout3d(p=dropout),
+            nn.Conv3d(middle_channels, middle_channels, kernel_size=3, padding=1),
+            nn.BatchNorm3d(middle_channels),
+            nn.ReLU(inplace=True),
+            nn.Dropout3d(p=dropout),
+            nn.Conv3d(middle_channels, middle_channels, kernel_size=3, padding=1),
+            nn.BatchNorm3d(middle_channels),
+            nn.ReLU(inplace=True),
+            nn.Dropout3d(p=dropout),
+            nn.Conv3d(middle_channels, middle_channels, kernel_size=3, padding=1),
             nn.BatchNorm3d(middle_channels),
             nn.ReLU(inplace=True),
             nn.Dropout3d(p=dropout),

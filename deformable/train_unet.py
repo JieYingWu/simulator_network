@@ -4,7 +4,7 @@ import numpy as np
 from pathlib import Path
 from dataset import SimulatorDataset3D
 
-from model import UNet3D, SimuNet
+from model import UNet3D, SimuNet, SimuNetWithSurface
 from loss import MeshLoss
 
 import sys
@@ -19,14 +19,15 @@ from torchsummary import summary
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-FEM_WEIGHT = 1
+FEM_WEIGHT = 1000
+REG_WEIGHT = 0.01
  
 if __name__ == '__main__':
     
     root = Path("checkpoints")
     num_workers = 6
-    train_set = ['data3', 'data4', 'data5',  'data6', 'data7', 'data8', 'data9', 'data10', 'data11']
-    val_set = ['data0']
+    train_set = ['data6']#, 'data4', 'data5',  'data6', 'data7', 'data8', 'data9', 'data10', 'data11']
+    val_set = ['data4']
     # Testing on data1 and 2
     
     path = '../../dataset/2019-10-09-reduced'
@@ -49,12 +50,12 @@ if __name__ == '__main__':
         val_label_path = val_label_path + [path+'/camera/' + v + '_filtered/']
         val_fem_path = train_simulator_path + [path+'/simulator/5e3_data/' + v + '/']
 
-    epoch_to_use = 5
+    epoch_to_use = 20
     use_previous_model = False
     validate_each = 5
-    play_each = 10
+    play_each = 1
     
-    batch_size = 64
+    batch_size = 32
     lr = 1.0e-4
     n_epochs = 500
     momentum=0.9
@@ -63,18 +64,18 @@ if __name__ == '__main__':
     base_mesh = torch.from_numpy(base_mesh).float()
     base_mesh = base_mesh.reshape(utils.VOL_SIZE).permute(3,0,1,2).unsqueeze(0)
 
-    train_dataset = SimulatorDataset3D(train_kinematics_path, train_simulator_path, train_label_path, train_fem_path, augment=False)
+    train_dataset = SimulatorDataset3D(train_kinematics_path, train_simulator_path, train_label_path, train_fem_path, augment=True)
     val_dataset = SimulatorDataset3D(val_kinematics_path, val_simulator_path, val_label_path, val_fem_path, augment=False)
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     
-    model = UNet3D(in_channels=utils.IN_CHANNELS, out_channels=utils.OUT_CHANNELS, dropout=utils.DROPOUT).to(device)
+    model = SimuNetWithSurface(in_channels=utils.IN_CHANNELS, out_channels=utils.OUT_CHANNELS, dropout=utils.DROPOUT).to(device)
     if not use_previous_model:
         model = utils.init_net(model)
 #    summary(model, input_size=(3, img_size[0], img_size[1], img_size[2]))
 
     base_mesh = base_mesh.to(device)
-    loss_fn = MeshLoss(batch_size, FEM_WEIGHT, base_mesh, device)
+    loss_fn = MeshLoss(FEM_WEIGHT, REG_WEIGHT,  base_mesh, device)
     optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum) 
     scheduler = ReduceLROnPlateau(optimizer)
     
@@ -119,7 +120,7 @@ if __name__ == '__main__':
         'scheduler': scheduler.state_dict()
     }, str(model_path))
 
-    print('In train_unet.py, not using any Chamfer Loss')
+    print('In train_unet.py, using 3 loss: FEM L2, chamfer, and regularization. Using PC as input')
     
     try:    
         for e in range(epoch, n_epochs + 1):
@@ -131,13 +132,13 @@ if __name__ == '__main__':
             epoch_loss = 0
             train_dataset.__set_network__()
 
-            for i, (kinematics, mesh, label, fem) in enumerate(train_loader):
-                kinematics, mesh, label, fem  = kinematics.to(device), mesh.to(device), label.to(device), fem.to(device)
-#                mesh_kinematics = utils.concat_mesh_kinematics(mesh, kinematics)
+            for i, (kinematics, mesh, label, fem, pc_last) in enumerate(train_loader):
+                kinematics, mesh, label, fem, pc_last = kinematics.to(device), mesh.to(device), label.to(device), fem.to(device), pc_last.to(device)
+                #mesh_kinematics = utils.concat_mesh_kinematics(mesh, kinematics)
 
-                pred = model(mesh, label, kinematics)
+                pred = model(mesh, pc_last, kinematics)
                 corrected = utils.correct(mesh, pred)
-                loss = loss_fn(corrected, label, fem)
+                loss = loss_fn(corrected, label, fem, pred)
                 epoch_loss += loss.item()
 
                 optimizer.zero_grad()
@@ -157,12 +158,12 @@ if __name__ == '__main__':
                 torch.cuda.empty_cache()
                 all_val_loss = []
                 with torch.no_grad():
-                    for j, (kinematics, mesh, label, fem) in enumerate(val_loader):
-                        kinematics, mesh, label, fem  = kinematics.to(device), mesh.to(device), label.to(device), fem.to(device)
-#                        mesh_kinematics = utils.concat_mesh_kinematics(mesh, kinematics)
-                        pred = model(mesh, label, kinematics)
+                    for j, (kinematics, mesh, label, fem, pc_last) in enumerate(val_loader):
+                        kinematics, mesh, label, fem, pc_last = kinematics.to(device), mesh.to(device), label.to(device), fem.to(device), pc_last.to(device)
+                        #mesh_kinematics = utils.concat_mesh_kinematics(mesh, kinematics)
+                        pred = model(mesh, pc_last, kinematics)
                         corrected = utils.correct(mesh, pred)
-                        loss = loss_fn(corrected, label, fem)
+                        loss = loss_fn(corrected, label, fem, pred)
                         all_val_loss.append(loss.item())
 
                         if (j == 500):

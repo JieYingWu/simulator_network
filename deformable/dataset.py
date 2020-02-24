@@ -87,20 +87,29 @@ class SimulatorDataset3D(Dataset):
  #       else:
         simulation = utils.reshape_volume(np.genfromtxt(self.simulator_array[idx]))
         simulation = torch.from_numpy(simulation).float()
-
      
         if self.augment and random.random() < 0.8:
             simulation = add_gaussian_noise(simulation)
-            
+
+        # Current point cloud
+        pc_last = plyfile.PlyData.read(self.label_array[idx])['vertex']
+        pc_last = np.concatenate((np.expand_dims(pc_last['x'], 1), np.expand_dims(pc_last['y'],1), np.expand_dims(pc_last['z'],1)), 1)
+        indices = range(pc_last.shape[0])
+        random.shuffle(indices)
+        pc_last = pc_last[indices[0:self.pc_length], :]
+        pc_last = torch.from_numpy(np.transpose(pc_last, (1,0))).float()
+
+        # Next point cloud
         pc = plyfile.PlyData.read(self.label_array[idx+1])['vertex']
         pc = np.concatenate((np.expand_dims(pc['x'], 1), np.expand_dims(pc['y'],1), np.expand_dims(pc['z'],1)), 1)
         indices = range(pc.shape[0])
         random.shuffle(indices)
         pc = pc[indices[0:self.pc_length], :]
-        pc = np.transpose(pc, (1,0))
+        pc = torch.from_numpy(np.transpose(pc, (1,0))).float()
+
         fem = torch.from_numpy(utils.reshape_volume(np.genfromtxt(self.fem_array[idx+1]))).float()
 
-        return kinematics, simulation, torch.from_numpy(pc).float(), fem
+        return kinematics, simulation, pc, fem, pc_last
 
     
 class SimulatorDataset2D(Dataset):

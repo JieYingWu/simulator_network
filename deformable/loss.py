@@ -7,24 +7,40 @@ from chamferdist.chamferdist import ChamferDistance
 import sys
 np.set_printoptions(threshold=sys.maxsize)
 
+class RegularizationLoss(nn.Module):
 
+    def __init__(self):
+        super(RegularizationLoss, self).__init__()
+        self.distance_fn = nn.MSELoss()
+        
+    def forward(self, mesh):
+        size = mesh.size()
+        loss = 0
+        for x in range(mesh.size()[2]-1):
+            for y in range(mesh.size()[3]-1):
+                for z in range(mesh.size()[4]-1):
+                    loss += self.distance_fn(mesh[:,:,x,y,z], mesh[:,:,x+1,y,z])
+                    loss += self.distance_fn(mesh[:,:,x,y,z], mesh[:,:,x,y+1,z])
+                    loss += self.distance_fn(mesh[:,:,x,y,z], mesh[:,:,x,y,z+1])
+        return loss
+    
 class MeshLoss(nn.Module):
     """Computes loss from a point cloud to a mesh
     """
 
-    def __init__(self, batch_size, weight, base_mesh, device):
+    def __init__(self, fem_weight, reg_weight, base_mesh, device):
         super(MeshLoss, self).__init__()
-        self.batch_size = batch_size
         self.device = device
         self.chamfer = ChamferDistance()
         self.fem_loss_fn = nn.MSELoss()
-        self.weight = weight
+        self.fem_weight = fem_weight
+        self.reg_weight = reg_weight
         self.base_mesh = base_mesh.to(device)
+        self.reg_fn = RegularizationLoss()
 
-    def forward(self, network_mesh, pc, fem_mesh):
+    def forward(self, network_mesh, pc, fem_mesh, pred):
         # get probabilities from logits
         top = network_mesh[:,:,:,-1,:]
-        bottom = network_mesh[:,:,:,0:-1,:]
         
         # Match the top, camera observed layer
 #        top = refine_mesh(top, 3, self.device)
@@ -37,7 +53,7 @@ class MeshLoss(nn.Module):
 #        print('-------')
 #        print(top)
 #        print(pc)
-        #dist1, dist2, idx1, idx2 = self.chamfer(top, pc)
+#        dist1, dist2, idx1, idx2 = self.chamfer(top, pc)
 
         if False:
             num = 10
@@ -69,10 +85,11 @@ class MeshLoss(nn.Module):
 #        print(base_mesh[0,2,:,1,:])
 #        print(network_mesh[0,2,:,1,:])
         fem_loss = self.fem_loss_fn(network_mesh, fem_mesh)
+        regularization = self.reg_fn(pred)
         # Only want pc -> mesh loss to ignore occluded regions
-        loss = fem_loss#torch.mean(dist2) + fem_loss * self.weight# + torch.mean(dist1)
+        loss = fem_loss*self.fem_weight + regularization*self.reg_weight# + torch.mean(dist2)# + fem_loss * self.weight# + torch.mean(dist1)
+        #print(fem_loss, regularization)
 #        print(torch.mean(dist2), fem_loss)
-        # Average the Dice score across all channels/classes
         return loss
 
 
