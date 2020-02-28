@@ -77,7 +77,7 @@ if __name__ == "__main__":
         print('Too many arguments')
         exit()
     
-    net = SimuNetWithSurface(in_channels=utils.IN_CHANNELS, out_channels=utils.OUT_CHANNELS, dropout=utils.DROPOUT)
+    net = SimuNet(in_channels=utils.IN_CHANNELS, out_channels=utils.OUT_CHANNELS, dropout=utils.DROPOUT)
     # Load previous model if requested
     if network_path.exists():
         state = torch.load(str(network_path))

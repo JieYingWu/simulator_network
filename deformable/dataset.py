@@ -10,7 +10,7 @@ from torch.utils.data import Dataset
 
 augment_steps = 60.0
 
-scale = torch.tensor([5.28, 7.16, 7.86])/10
+scale = torch.tensor([5.28, 7.16, 7.86])/5
 def add_gaussian_noise(mesh):
     x = torch.empty(mesh.size()[1:]).normal_(mean=0,std=scale[0]).unsqueeze(0)
     y = torch.empty(mesh.size()[1:]).normal_(mean=0,std=scale[1]).unsqueeze(0)
@@ -32,10 +32,10 @@ class SimulatorDataset3D(Dataset):
                 self.kinematics_array = np.concatenate((self.kinematics_array, np.genfromtxt(path, delimiter=',')[:,0:utils.FIELDS+1]))
         self.kinematics_array = torch.from_numpy(self.kinematics_array).float()
                 
-        self.simulator_array = []
-        for path in simulator_path:
-            files = sorted(os.listdir(path))
-            self.simulator_array = self.simulator_array + [path + x for x in files]
+#        self.simulator_array = []
+#        for path in simulator_path:
+#            files = sorted(os.listdir(path))
+#            self.simulator_array = self.simulator_array + [path + x for x in files]
 
         self.label_array = []
         for path in label_path:
@@ -62,18 +62,18 @@ class SimulatorDataset3D(Dataset):
     def __len__(self):
         return len(self.label_array)-1
 
-    def add_model_noise(self, idx, steps):
-        if idx < steps:
-            idx = steps
+    # def add_model_noise(self, idx, steps):
+    #     if idx < steps:
+    #         idx = steps
             
-        simulation_prev = utils.reshape_volume(np.genfromtxt(self.simulator_array[idx - steps]))
-        simulation_prev = torch.from_numpy(simulation_prev).float().unsqueeze(0)
+    #     simulation_prev = utils.reshape_volume(np.genfromtxt(self.simulator_array[idx - steps]))
+    #     simulation_prev = torch.from_numpy(simulation_prev).float().unsqueeze(0)
 
-        for i in range(steps,0,-1):
-            kinematics_prev = self.kinematics_array[idx-i,1:1+utils.FIELDS].unsqueeze(0)
-            mesh_kinematics = utils.concat_mesh_kinematics(simulation_prev, kinematics_prev)
-            correction = self.net(mesh_kinematics).detach()
-            simulation_prev = utils.correct_cpu(simulation_prev, correction)
+    #     for i in range(steps,0,-1):
+    #         kinematics_prev = self.kinematics_array[idx-i,1:1+utils.FIELDS].unsqueeze(0)
+    #         mesh_kinematics = utils.concat_mesh_kinematics(simulation_prev, kinematics_prev)
+    #         correction = self.net(mesh_kinematics).detach()
+    #         simulation_prev = utils.correct_cpu(simulation_prev, correction)
 
         return simulation_prev.squeeze(0)
     
@@ -85,7 +85,7 @@ class SimulatorDataset3D(Dataset):
  #           value = random.randint(0, augment_steps)
  #           simulation = self.add_model_noise(idx, value)
  #       else:
-        simulation = utils.reshape_volume(np.genfromtxt(self.simulator_array[idx]))
+        simulation = utils.reshape_volume(np.genfromtxt(self.fem_array[idx]))
         simulation = torch.from_numpy(simulation).float()
      
         if self.augment and random.random() < 0.8:

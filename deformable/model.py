@@ -10,17 +10,17 @@ class PointNetfeat(nn.Module):
         self.conv1 = torch.nn.Conv1d(3, conv_depth[0], 1)
         self.conv2 = torch.nn.Conv1d(conv_depth[0], conv_depth[1], 1)
         self.conv3 = torch.nn.Conv1d(conv_depth[1], conv_depth[2], 1)
-        self.bn1 = nn.BatchNorm1d(conv_depth[0])
-        self.bn2 = nn.BatchNorm1d(conv_depth[1])
-        self.bn3 = nn.BatchNorm1d(conv_depth[2])
+#        self.bn1 = nn.BatchNorm1d(conv_depth[0])
+#        self.bn2 = nn.BatchNorm1d(conv_depth[1])
+#        self.bn3 = nn.BatchNorm1d(conv_depth[2])
 
     def forward(self, x):
         n_pts = x.size()[2]
-        x = F.relu(self.bn1(self.conv1(x)))
+        x = F.relu(self.conv1(x))
 
         pointfeat = x
-        x = F.relu(self.bn2(self.conv2(x)))
-        x = self.bn3(self.conv3(x))
+        x = F.relu(self.conv2(x))
+        x = self.conv3(x)
         x = torch.max(x, 2, keepdim=True)[0]
         x = x.view(-1, self.conv_depth[2])
         return x
@@ -47,7 +47,7 @@ class SimuNetWithSurface(nn.Module):
 
         # encoder, center and decoder layers
         self.encoder_layers = nn.Sequential(*encoder_layers)
-        self.center = Center3D(conv_depths[-2]+256+10, conv_depths[-1]+128, conv_depths[-1], conv_depths[-2], dropout=dropout)
+        self.center = Center3D(conv_depths[-2]+256+10, conv_depths[-1]+256, conv_depths[-1]+128, conv_depths[-2], dropout=dropout)
         self.decoder_layers = nn.Sequential(*decoder_layers)
 
     def forward(self, x, pc, kinematics):
@@ -77,6 +77,7 @@ class SimuNet(nn.Module):
     def __init__(self, in_channels, out_channels, conv_depth= (256,256,256,512,512), dropout=False):
 
         super(SimuNet, self).__init__()
+        self.pc_layers = PointNetfeat()
         
         layers = [
             nn.Conv3d(in_channels, conv_depth[0], kernel_size=3, padding=1),
@@ -84,23 +85,23 @@ class SimuNet(nn.Module):
             nn.ReLU(inplace=True),
             nn.Dropout3d(p=dropout),
             nn.Conv3d(conv_depth[0], conv_depth[1], kernel_size=3, padding=1),
-            nn.BatchNorm3d(conv_depth[1]),
+#            nn.BatchNorm3d(conv_depth[1]),
             nn.ReLU(inplace=True),
             nn.Dropout3d(p=dropout),
             nn.Conv3d(conv_depth[1], conv_depth[2], kernel_size=3, padding=1),
-            nn.BatchNorm3d(conv_depth[2]),
+#            nn.BatchNorm3d(conv_depth[2]),
             nn.ReLU(inplace=True),
             nn.Dropout3d(p=dropout),
             nn.Conv3d(conv_depth[2], conv_depth[3], kernel_size=3, padding=1),
-            nn.BatchNorm3d(conv_depth[3]),
+#            nn.BatchNorm3d(conv_depth[3]),
             nn.ReLU(inplace=True),
             nn.Dropout3d(p=dropout),
             nn.Conv3d(conv_depth[3], conv_depth[4], kernel_size=3, padding=1),
-            nn.BatchNorm3d(conv_depth[4]),
+#            nn.BatchNorm3d(conv_depth[4]),
             nn.ReLU(inplace=True),
             nn.Dropout3d(p=dropout),
             nn.Conv3d(conv_depth[4], out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm3d(out_channels),
+#            nn.BatchNorm3d(out_channels),
             nn.ReLU(inplace=True),
             nn.Conv3d(out_channels, out_channels, kernel_size=3, padding=1),
             nn.Tanh()
@@ -108,8 +109,13 @@ class SimuNet(nn.Module):
 
         self.layers = nn.Sequential(*layers)
 
-    def forward(self, x):
-        return self.layers(x)
+    def forward(self, x, pc, kinematics):
+        pc_feat = self.pc_layers(pc)
+        features = torch.cat((pc_feat, kinematics), axis=1).unsqueeze(2).unsqueeze(3).unsqueeze(4)
+        features = features.repeat(1, 1, x.size()[2], x.size()[3], x.size()[4])
+        x_pc = torch.cat((x, features), axis=1)
+        
+        return self.layers(x_pc)
         
 # modified from https://github.com/cosmic-cortex/pytorch-UNet
 class UNet3D(nn.Module):
@@ -178,11 +184,11 @@ class First3D(nn.Module):
 
         layers = [
             nn.Conv3d(in_channels, middle_channels, kernel_size=3, padding=1),
-            nn.BatchNorm3d(middle_channels),
+#            nn.BatchNorm3d(middle_channels),
             nn.ReLU(inplace=True),
             nn.Dropout3d(p=dropout),
             nn.Conv3d(middle_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm3d(out_channels),
+#            nn.BatchNorm3d(out_channels),
             nn.ReLU(inplace=True),
             nn.Dropout3d(p=dropout),
         ]
@@ -203,11 +209,11 @@ class Encoder3D(nn.Module):
         layers = [
 #            nn.MaxPool3d(kernel_size=downsample_kernel),
             nn.Conv3d(in_channels, middle_channels, kernel_size=3, padding=1),
-            nn.BatchNorm3d(middle_channels),
+#            nn.BatchNorm3d(middle_channels),
             nn.ReLU(inplace=True),
             nn.Dropout3d(p=dropout),
             nn.Conv3d(middle_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm3d(out_channels),
+#            nn.BatchNorm3d(out_channels),
             nn.ReLU(inplace=True),
             nn.Dropout3d(p=dropout),
         ]
@@ -225,23 +231,23 @@ class Center3D(nn.Module):
         layers = [
             nn.MaxPool3d(kernel_size=2),
             nn.Conv3d(in_channels, middle_channels, kernel_size=3, padding=1),
-            nn.BatchNorm3d(middle_channels),
+#            nn.BatchNorm3d(middle_channels),
             nn.ReLU(inplace=True),
             nn.Dropout3d(p=dropout),
             nn.Conv3d(middle_channels, middle_channels, kernel_size=3, padding=1),
-            nn.BatchNorm3d(middle_channels),
+#            nn.BatchNorm3d(middle_channels),
             nn.ReLU(inplace=True),
             nn.Dropout3d(p=dropout),
             nn.Conv3d(middle_channels, middle_channels, kernel_size=3, padding=1),
-            nn.BatchNorm3d(middle_channels),
+#            nn.BatchNorm3d(middle_channels),
             nn.ReLU(inplace=True),
             nn.Dropout3d(p=dropout),
             nn.Conv3d(middle_channels, middle_channels, kernel_size=3, padding=1),
-            nn.BatchNorm3d(middle_channels),
+#            nn.BatchNorm3d(middle_channels),
             nn.ReLU(inplace=True),
             nn.Dropout3d(p=dropout),
             nn.Conv3d(middle_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm3d(out_channels),
+#            nn.BatchNorm3d(out_channels),
             nn.ReLU(inplace=True),
             nn.Dropout3d(p=dropout),
             nn.ConvTranspose3d(out_channels, deconv_channels, kernel_size=2, stride=2)
@@ -261,11 +267,11 @@ class Decoder3D(nn.Module):
 
         layers = [
             nn.Conv3d(in_channels, middle_channels, kernel_size=3, padding=1),
-            nn.BatchNorm3d(middle_channels),
+#            nn.BatchNorm3d(middle_channels),
             nn.ReLU(inplace=True),
             nn.Dropout3d(p=dropout),
             nn.Conv3d(middle_channels, out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm3d(out_channels),
+#            nn.BatchNorm3d(out_channels),
             nn.ReLU(inplace=True),
             nn.Dropout3d(p=dropout),
             nn.ConvTranspose3d(out_channels, deconv_channels, kernel_size=2, stride=2)
@@ -283,11 +289,11 @@ class Last3D(nn.Module):
 
         layers = [
             nn.Conv3d(in_channels, middle_channels, kernel_size=3, padding=1),
-            nn.BatchNorm3d(middle_channels),
+#            nn.BatchNorm3d(middle_channels),
             nn.ReLU(inplace=True),
             #nn.Dropout3d(p=dropout),
             nn.Conv3d(middle_channels, middle_channels, kernel_size=3, padding=1),
-            nn.BatchNorm3d(middle_channels),
+#            nn.BatchNorm3d(middle_channels),
             nn.ReLU(inplace=True),
             #nn.Dropout3d(p=dropout),
             nn.Conv3d(middle_channels, out_channels, kernel_size=1),

@@ -19,9 +19,9 @@ from torchsummary import summary
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-FEM_WEIGHT = 1000
-REG_WEIGHT = 0.01
- 
+FEM_WEIGHT = 10
+REG_WEIGHT = 0.001
+
 if __name__ == '__main__':
     
     root = Path("checkpoints")
@@ -34,26 +34,30 @@ if __name__ == '__main__':
     train_kinematics_path = []
     train_simulator_path = []
     train_label_path = []
+    train_fem_path = []
+    
     for v in train_set:
         train_kinematics_path = train_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_velocity.csv']
         train_simulator_path = train_simulator_path + [v + '/']
         train_label_path = train_label_path + [path+'/camera/' + v + '_filtered/']
-        train_fem_path = train_simulator_path + [path+'/simulator/5e3_data/' + v + '/']
+        train_fem_path = train_fem_path + [path+'/simulator/5e3_data/' + v + '/']
 
     print(train_kinematics_path)
     val_kinematics_path = []
     val_simulator_path = []
     val_label_path = []
+    val_fem_path = []
+
     for v in val_set:
         val_kinematics_path = val_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_velocity.csv']
         val_simulator_path = val_simulator_path + [v + '/']
         val_label_path = val_label_path + [path+'/camera/' + v + '_filtered/']
-        val_fem_path = train_simulator_path + [path+'/simulator/5e3_data/' + v + '/']
+        val_fem_path = train_fem_path + [path+'/simulator/5e3_data/' + v + '/']
 
-    epoch_to_use = 20
-    use_previous_model = False
+    epoch_to_use = 245
+    use_previous_model =True
     validate_each = 5
-    play_each = 1
+    play_each = 20
     
     batch_size = 32
     lr = 1.0e-4
@@ -69,7 +73,7 @@ if __name__ == '__main__':
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     
-    model = SimuNetWithSurface(in_channels=utils.IN_CHANNELS, out_channels=utils.OUT_CHANNELS, dropout=utils.DROPOUT).to(device)
+    model = SimuNet(in_channels=utils.IN_CHANNELS, out_channels=utils.OUT_CHANNELS, dropout=utils.DROPOUT).to(device)
     if not use_previous_model:
         model = utils.init_net(model)
 #    summary(model, input_size=(3, img_size[0], img_size[1], img_size[2]))
@@ -134,7 +138,7 @@ if __name__ == '__main__':
 
             for i, (kinematics, mesh, label, fem, pc_last) in enumerate(train_loader):
                 kinematics, mesh, label, fem, pc_last = kinematics.to(device), mesh.to(device), label.to(device), fem.to(device), pc_last.to(device)
-                #mesh_kinematics = utils.concat_mesh_kinematics(mesh, kinematics)
+#                mesh_kinematics = utils.concat_mesh_kinematics(mesh, kinematics)
 
                 pred = model(mesh, pc_last, kinematics)
                 corrected = utils.correct(mesh, pred)
@@ -160,7 +164,7 @@ if __name__ == '__main__':
                 with torch.no_grad():
                     for j, (kinematics, mesh, label, fem, pc_last) in enumerate(val_loader):
                         kinematics, mesh, label, fem, pc_last = kinematics.to(device), mesh.to(device), label.to(device), fem.to(device), pc_last.to(device)
-                        #mesh_kinematics = utils.concat_mesh_kinematics(mesh, kinematics)
+#                        mesh_kinematics = utils.concat_mesh_kinematics(mesh, kinematics)
                         pred = model(mesh, pc_last, kinematics)
                         corrected = utils.correct(mesh, pred)
                         loss = loss_fn(corrected, label, fem, pred)

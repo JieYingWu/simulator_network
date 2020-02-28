@@ -53,13 +53,19 @@ class MeshLoss(nn.Module):
 #        print('-------')
 #        print(top)
 #        print(pc)
-#        dist1, dist2, idx1, idx2 = self.chamfer(top, pc)
-
+        dist1, dist2, idx1, idx2 = self.chamfer(top, pc)
         if False:
             num = 10
             print('--------------------------')
 #            idx = idx2[0,0:num].detach().cpu().numpy()
 #            dist = dist2[0,0:num].detach().cpu().numpy()
+            print(top[:,:,0].min(), top[:,:,0].max(),
+              top[:,:,1].min(), top[:,:,1].max(),
+              top[:,:,2].min(), top[:,:,2].max())
+            print(pc[:,:,0].min(), top[:,:,0].max(),
+              pc[:,:,1].min(), pc[:,:,1].max(),
+              pc[:,:,2].min(), pc[:,:,2].max())
+
             dist1 = dist1[0].detach().cpu().numpy()
             idx1 = idx1[0].detach().cpu().numpy()
             dist2 = dist2[0].detach().cpu().numpy()
@@ -84,11 +90,11 @@ class MeshLoss(nn.Module):
 #        base_mesh = self.base_mesh.repeat((network_mesh.size()[0], 1, 1, 1, 1))
 #        print(base_mesh[0,2,:,1,:])
 #        print(network_mesh[0,2,:,1,:])
-        fem_loss = self.fem_loss_fn(network_mesh, fem_mesh)
+        fem_loss = self.fem_loss_fn(network_mesh[:,:,:,0:-1,:], fem_mesh[:,:,:,0:-1,:])
         regularization = self.reg_fn(pred)
         # Only want pc -> mesh loss to ignore occluded regions
-        loss = fem_loss*self.fem_weight + regularization*self.reg_weight# + torch.mean(dist2)# + fem_loss * self.weight# + torch.mean(dist1)
-        #print(fem_loss, regularization)
+        loss = fem_loss*self.fem_weight + regularization*self.reg_weight + torch.mean(dist2)# + fem_loss * self.weight# + torch.mean(dist1)
+        #print(fem_loss, regularization, torch.mean(dist2))
 #        print(torch.mean(dist2), fem_loss)
         return loss
 
