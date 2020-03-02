@@ -39,11 +39,9 @@ class MeshLoss(nn.Module):
         self.reg_fn = RegularizationLoss()
 
     def forward(self, network_mesh, pc, fem_mesh, pred):
-        # get probabilities from logits
-        top = network_mesh[:,:,:,-1,:]
-        
         # Match the top, camera observed layer
-#        top = refine_mesh(top, 3, self.device)
+        top = network_mesh[:,:,:,-1,:]
+        top = refine_mesh(top, 3, self.device)
         top = top.reshape(top.size()[0],top.size()[1],-1)
         
         pc = pc.permute(0,2,1).contiguous()
@@ -90,10 +88,10 @@ class MeshLoss(nn.Module):
 #        base_mesh = self.base_mesh.repeat((network_mesh.size()[0], 1, 1, 1, 1))
 #        print(base_mesh[0,2,:,1,:])
 #        print(network_mesh[0,2,:,1,:])
-        fem_loss = self.fem_loss_fn(network_mesh[:,:,:,0:-1,:], fem_mesh[:,:,:,0:-1,:])
+        fem_loss = self.fem_loss_fn(network_mesh, fem_mesh)
         regularization = self.reg_fn(pred)
         # Only want pc -> mesh loss to ignore occluded regions
-        loss = fem_loss*self.fem_weight + regularization*self.reg_weight + torch.mean(dist2)# + fem_loss * self.weight# + torch.mean(dist1)
+        loss = fem_loss*self.fem_weight + regularization*self.reg_weight #+ torch.mean(dist2)# + fem_loss * self.weight# + torch.mean(dist1)
         #print(fem_loss, regularization, torch.mean(dist2))
 #        print(torch.mean(dist2), fem_loss)
         return loss

@@ -10,7 +10,7 @@ from torch.utils.data import Dataset
 
 augment_steps = 60.0
 
-scale = torch.tensor([5.28, 7.16, 7.86])/5
+scale = torch.tensor([5.28, 7.16, 7.86])/8
 def add_gaussian_noise(mesh):
     x = torch.empty(mesh.size()[1:]).normal_(mean=0,std=scale[0]).unsqueeze(0)
     y = torch.empty(mesh.size()[1:]).normal_(mean=0,std=scale[1]).unsqueeze(0)
@@ -27,9 +27,9 @@ class SimulatorDataset3D(Dataset):
         self.kinematics_array = None
         for path in kinematics_path:
             if self.kinematics_array is None:
-                self.kinematics_array = np.genfromtxt(path, delimiter=',')[:,0:utils.FIELDS+1]
+                self.kinematics_array = np.genfromtxt(path, delimiter=',')[:,0:utils.FIELDS]
             else:
-                self.kinematics_array = np.concatenate((self.kinematics_array, np.genfromtxt(path, delimiter=',')[:,0:utils.FIELDS+1]))
+                self.kinematics_array = np.concatenate((self.kinematics_array, np.genfromtxt(path, delimiter=',')[:,0:utils.FIELDS]))
         self.kinematics_array = torch.from_numpy(self.kinematics_array).float()
                 
 #        self.simulator_array = []
@@ -79,7 +79,7 @@ class SimulatorDataset3D(Dataset):
     
     # return robot kinematics, mesh, and point cloud
     def __getitem__(self, idx):
-        kinematics = self.kinematics_array[idx,1:1+utils.FIELDS]
+        kinematics = self.kinematics_array[idx]
         
  #       if self.augment and self.net:
  #           value = random.randint(0, augment_steps)
@@ -92,12 +92,12 @@ class SimulatorDataset3D(Dataset):
             simulation = add_gaussian_noise(simulation)
 
         # Current point cloud
-        pc_last = plyfile.PlyData.read(self.label_array[idx])['vertex']
-        pc_last = np.concatenate((np.expand_dims(pc_last['x'], 1), np.expand_dims(pc_last['y'],1), np.expand_dims(pc_last['z'],1)), 1)
-        indices = range(pc_last.shape[0])
-        random.shuffle(indices)
-        pc_last = pc_last[indices[0:self.pc_length], :]
-        pc_last = torch.from_numpy(np.transpose(pc_last, (1,0))).float()
+        # pc_last = plyfile.PlyData.read(self.label_array[idx])['vertex']
+        # pc_last = np.concatenate((np.expand_dims(pc_last['x'], 1), np.expand_dims(pc_last['y'],1), np.expand_dims(pc_last['z'],1)), 1)
+        # indices = range(pc_last.shape[0])
+        # random.shuffle(indices)
+        # pc_last = pc_last[indices[0:self.pc_length], :]
+        # pc_last = torch.from_numpy(np.transpose(pc_last, (1,0))).float()
 
         # Next point cloud
         pc = plyfile.PlyData.read(self.label_array[idx+1])['vertex']
@@ -109,7 +109,7 @@ class SimulatorDataset3D(Dataset):
 
         fem = torch.from_numpy(utils.reshape_volume(np.genfromtxt(self.fem_array[idx+1]))).float()
 
-        return kinematics, simulation, pc, fem, pc_last
+        return kinematics, simulation, pc, fem#, pc_last
 
     
 class SimulatorDataset2D(Dataset):

@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 #https://github.com/fxia22/pointnet.pytorch
 class PointNetfeat(nn.Module):
-    def __init__(self, conv_depth=(64,128,256)):
+    def __init__(self, conv_depth=(16,32,64)):
         super(PointNetfeat, self).__init__()
         self.conv_depth = conv_depth
         self.conv1 = torch.nn.Conv1d(3, conv_depth[0], 1)
@@ -72,12 +72,153 @@ class SimuNetWithSurface(nn.Module):
 
         return x_dec[-1]
 
+class SimuFCNet(nn.Module):
+    def __init__(self, in_channels, out_channels, layer_size=(64, 128, 128, 256, 512), dropout=False):
+
+        super(SimuAttentionNet, self).__init__()
+#        self.pc_layers = PointNetfeat()
+#        self.pc_pos_layers = PointNetfeat(conv_depth=(64,128,325))
+
+        pos_layers = [
+            nn.Linear(3,layer_size[0]),
+            nn.Linear(layer_size[0], layer_size[1]),
+            nn.Linear(layer_size[1], layer_size[2]),
+            nn.Linear(layer_size[2], layer_size[3]),
+        ]
+
+        vel_layers = [
+            nn.Linear(3,layer_size[0]),
+            nn.Linear(layer_size[0], layer_size[1]),
+            nn.Linear(layer_size[1], layer_size[2]),
+            nn.Linear(layer_size[2], layer_size[3]),
+        ]
+
+        combined_layers = [
+            nn.Linear(layer_size[3], layer_size[4]),
+            nn.Linear(layer_size[4], layer_size[5]),
+            nn.Linear(layer_size[5], layer_size[6]),
+            nn.Linear(layer_size[6], out_channels),
+        ]
+
+
+        self.pos_layers = nn.Sequential(*pos_layers)
+        self.vel_layers = nn.Sequential(*vel_layers)
+        self.combined_layers = nn.Sequential(*combined_layers)
+
+    def forward(self, kinematics):#, pc):
+        pos_features = self.pos_layers(kinematics[:,0:3])
+        vel_features = self.vel_layers(kinematics[:,3:6])
+        combined_features = pos_features * vel_features
+        combined_features = self.combined_layers(combined_features)
+        return combined_features.reshape(utils.VOL_SIZE)
+    
+class SimuAttentionNet(nn.Module):
+    def __init__(self, in_channels, out_channels, conv_depth= (64, 128, 128, 256, 512), dropout=False):
+
+        super(SimuAttentionNet, self).__init__()
+#        self.pc_layers = PointNetfeat()
+#        self.pc_pos_layers = PointNetfeat(conv_depth=(64,128,325))
+
+        pos_layers = [
+            nn.Conv3d(in_channels, conv_depth[0], kernel_size=3, padding=1),
+            nn.BatchNorm3d(conv_depth[0]),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(conv_depth[0], conv_depth[1], kernel_size=3, padding=1),
+            nn.BatchNorm3d(conv_depth[1]),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(conv_depth[1], in_channels, kernel_size=3, padding=1),
+            nn.BatchNorm3d(in_channels),
+            nn.ReLU(inplace=True)
+        ]
+
+        vel_layers = [
+            nn.Conv3d(in_channels, conv_depth[0], kernel_size=3, padding=1),
+            nn.BatchNorm3d(conv_depth[0]),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(conv_depth[0], conv_depth[1], kernel_size=3, padding=1),
+            nn.BatchNorm3d(conv_depth[1]),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(conv_depth[1], in_channels, kernel_size=3, padding=1),
+            nn.BatchNorm3d(in_channels),
+            nn.ReLU(inplace=True)
+            ]
+
+        # mesh_layers = [
+        #     nn.Conv3d(in_channels, conv_depth[0], kernel_size=3, padding=1),
+        #     nn.BatchNorm3d(conv_depth[0]),
+        #     nn.ReLU(inplace=True),
+        #     nn.Dropout3d(p=dropout),
+        #     nn.Conv3d(conv_depth[0], conv_depth[1], kernel_size=3, padding=1),
+        #     nn.BatchNorm3d(conv_depth[1]),
+        #     nn.ReLU(inplace=True),
+        #     nn.Dropout3d(p=dropout)
+        # ]
+        
+        layers = [
+            nn.Conv3d(in_channels*2, conv_depth[0], kernel_size=3, padding=1),
+            nn.BatchNorm3d(conv_depth[0]),
+            nn.ReLU(inplace=True),
+            nn.Dropout3d(p=dropout),
+            nn.Conv3d(conv_depth[0], conv_depth[1], kernel_size=3, padding=1),
+            nn.BatchNorm3d(conv_depth[1]),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(conv_depth[1], conv_depth[2], kernel_size=3, padding=1),
+            nn.BatchNorm3d(conv_depth[2]),
+            nn.ReLU(inplace=True),
+            nn.Dropout3d(p=dropout),
+            nn.Conv3d(conv_depth[2], conv_depth[3], kernel_size=3, padding=1),
+            nn.BatchNorm3d(conv_depth[3]),
+            nn.ReLU(inplace=True),
+            nn.Dropout3d(p=dropout),
+            nn.Conv3d(conv_depth[3], conv_depth[4], kernel_size=3, padding=1),
+            nn.BatchNorm3d(conv_depth[4]),
+            nn.ReLU(inplace=True),
+            nn.Dropout3d(p=dropout),
+            nn.Conv3d(conv_depth[4], out_channels, kernel_size=3, padding=1),
+            nn.BatchNorm3d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(out_channels, out_channels, kernel_size=3, padding=1),
+            nn.Tanh()
+        ]
+
+        self.pos_layers = nn.Sequential(*pos_layers)
+        self.vel_layers = nn.Sequential(*vel_layers)
+ #       self.mesh_layers = nn.Sequential(*mesh_layers)
+        self.layers = nn.Sequential(*layers)
+
+    def forward(self, x, kinematics):#, pc):
+#        pc_features = self.pc_layers(pc)
+#        pc_features = pc_features.unsqueeze(2).unsqueeze(3).unsqueeze(4)
+#        pc_features = pc_features.repeat(1, 1, x.size()[2], x.size()[3], x.size()[4])
+
+#        pc_pos = self.pc_pos_layers(pc)
+#        pc_pos = pc_pos.reshape(pc_pos.size()[0], 1, 13, 5 ,5)
+#        pc_pos = pc_pos.repeat(1, 64, 1, 1, 1)
+        
+        pos = kinematics[:,0:3].unsqueeze(2).unsqueeze(3).unsqueeze(4)
+        pos = pos.repeat(1, 1, x.size()[2], x.size()[3], x.size()[4])
+        pos_features = self.pos_layers(pos)
+        
+        vel = kinematics[:,3:6].unsqueeze(2).unsqueeze(3).unsqueeze(4)
+        vel = vel.repeat(1, 1, x.size()[2], x.size()[3], x.size()[4])        
+        vel_features = self.vel_layers(vel)
+
+#        mesh_features = self.mesh_layers(x)
+        
+        robot_features = pos_features * vel_features
+#        pc_features = pc_pos * pc_features
+#        features = torch.cat((robot_features, pc_features), axis=1)
+       
+        x = torch.cat((x, robot_features), axis=1)
+        
+        return self.layers(x)
+    
 
 class SimuNet(nn.Module):
     def __init__(self, in_channels, out_channels, conv_depth= (256,256,256,512,512), dropout=False):
 
         super(SimuNet, self).__init__()
-        self.pc_layers = PointNetfeat()
+#        self.pc_layers = PointNetfeat()
         
         layers = [
             nn.Conv3d(in_channels, conv_depth[0], kernel_size=3, padding=1),
@@ -109,9 +250,10 @@ class SimuNet(nn.Module):
 
         self.layers = nn.Sequential(*layers)
 
-    def forward(self, x, pc, kinematics):
-        pc_feat = self.pc_layers(pc)
-        features = torch.cat((pc_feat, kinematics), axis=1).unsqueeze(2).unsqueeze(3).unsqueeze(4)
+    def forward(self, x, kinematics):
+#        pc_feat = self.pc_layers(pc)
+#        features = torch.cat((pc_feat, kinematics), axis=1).unsqueeze(2).unsqueeze(3).unsqueeze(4)
+        features = kinematics.unsqueeze(2).unsqueeze(3).unsqueeze(4)
         features = features.repeat(1, 1, x.size()[2], x.size()[3], x.size()[4])
         x_pc = torch.cat((x, features), axis=1)
         
