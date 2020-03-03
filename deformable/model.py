@@ -71,46 +71,6 @@ class SimuNetWithSurface(nn.Module):
             x_dec.append(dec_layer(x_cat))
 
         return x_dec[-1]
-
-class SimuFCNet(nn.Module):
-    def __init__(self, in_channels, out_channels, layer_size=(64, 128, 128, 256, 512), dropout=False):
-
-        super(SimuAttentionNet, self).__init__()
-#        self.pc_layers = PointNetfeat()
-#        self.pc_pos_layers = PointNetfeat(conv_depth=(64,128,325))
-
-        pos_layers = [
-            nn.Linear(3,layer_size[0]),
-            nn.Linear(layer_size[0], layer_size[1]),
-            nn.Linear(layer_size[1], layer_size[2]),
-            nn.Linear(layer_size[2], layer_size[3]),
-        ]
-
-        vel_layers = [
-            nn.Linear(3,layer_size[0]),
-            nn.Linear(layer_size[0], layer_size[1]),
-            nn.Linear(layer_size[1], layer_size[2]),
-            nn.Linear(layer_size[2], layer_size[3]),
-        ]
-
-        combined_layers = [
-            nn.Linear(layer_size[3], layer_size[4]),
-            nn.Linear(layer_size[4], layer_size[5]),
-            nn.Linear(layer_size[5], layer_size[6]),
-            nn.Linear(layer_size[6], out_channels),
-        ]
-
-
-        self.pos_layers = nn.Sequential(*pos_layers)
-        self.vel_layers = nn.Sequential(*vel_layers)
-        self.combined_layers = nn.Sequential(*combined_layers)
-
-    def forward(self, kinematics):#, pc):
-        pos_features = self.pos_layers(kinematics[:,0:3])
-        vel_features = self.vel_layers(kinematics[:,3:6])
-        combined_features = pos_features * vel_features
-        combined_features = self.combined_layers(combined_features)
-        return combined_features.reshape(utils.VOL_SIZE)
     
 class SimuAttentionNet(nn.Module):
     def __init__(self, in_channels, out_channels, conv_depth= (64, 128, 128, 256, 512), dropout=False):
@@ -118,7 +78,6 @@ class SimuAttentionNet(nn.Module):
         super(SimuAttentionNet, self).__init__()
 #        self.pc_layers = PointNetfeat()
 #        self.pc_pos_layers = PointNetfeat(conv_depth=(64,128,325))
-
         pos_layers = [
             nn.Conv3d(in_channels, conv_depth[0], kernel_size=3, padding=1),
             nn.BatchNorm3d(conv_depth[0]),
@@ -208,7 +167,6 @@ class SimuAttentionNet(nn.Module):
         robot_features = pos_features * vel_features
 #        pc_features = pc_pos * pc_features
 #        features = torch.cat((robot_features, pc_features), axis=1)
-       
         x = torch.cat((x, robot_features), axis=1)
         
         return self.layers(x)

@@ -55,7 +55,7 @@ if __name__ == '__main__':
         val_label_path = val_label_path + [path+'/camera/' + v + '_filtered/']
         val_fem_path = train_fem_path + [path+'/simulator/5e3_data/' + v + '/']
 
-    epoch_to_use = 40
+    epoch_to_use = 200
     use_previous_model = True
     validate_each = 5
     play_each = 2000
