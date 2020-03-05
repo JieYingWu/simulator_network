@@ -73,7 +73,7 @@ class SimuNetWithSurface(nn.Module):
         return x_dec[-1]
     
 class SimuAttentionNet(nn.Module):
-    def __init__(self, in_channels, out_channels, conv_depth= (64, 128, 128, 256, 512), dropout=False):
+    def __init__(self, in_channels, out_channels, conv_depth= (32, 64, 128, 128, 256, 256, 512, 512, 1024, 1024), dropout=False):
 
         super(SimuAttentionNet, self).__init__()
 #        self.pc_layers = PointNetfeat()
@@ -85,8 +85,11 @@ class SimuAttentionNet(nn.Module):
             nn.Conv3d(conv_depth[0], conv_depth[1], kernel_size=3, padding=1),
             nn.BatchNorm3d(conv_depth[1]),
             nn.ReLU(inplace=True),
-            nn.Conv3d(conv_depth[1], in_channels, kernel_size=3, padding=1),
-            nn.BatchNorm3d(in_channels),
+            nn.Conv3d(conv_depth[1], conv_depth[2], kernel_size=3, padding=1),
+            nn.BatchNorm3d(conv_depth[2]),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(conv_depth[2], conv_depth[3], kernel_size=3, padding=1),
+            nn.BatchNorm3d(conv_depth[3]),
             nn.ReLU(inplace=True)
         ]
 
@@ -97,8 +100,11 @@ class SimuAttentionNet(nn.Module):
             nn.Conv3d(conv_depth[0], conv_depth[1], kernel_size=3, padding=1),
             nn.BatchNorm3d(conv_depth[1]),
             nn.ReLU(inplace=True),
-            nn.Conv3d(conv_depth[1], in_channels, kernel_size=3, padding=1),
-            nn.BatchNorm3d(in_channels),
+            nn.Conv3d(conv_depth[1], conv_depth[2], kernel_size=3, padding=1),
+            nn.BatchNorm3d(conv_depth[2]),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(conv_depth[2], conv_depth[3], kernel_size=3, padding=1),
+            nn.BatchNorm3d(conv_depth[3]),
             nn.ReLU(inplace=True)
             ]
 
@@ -114,29 +120,31 @@ class SimuAttentionNet(nn.Module):
         # ]
         
         layers = [
-            nn.Conv3d(in_channels*2, conv_depth[0], kernel_size=3, padding=1),
-            nn.BatchNorm3d(conv_depth[0]),
-            nn.ReLU(inplace=True),
-            nn.Dropout3d(p=dropout),
-            nn.Conv3d(conv_depth[0], conv_depth[1], kernel_size=3, padding=1),
-            nn.BatchNorm3d(conv_depth[1]),
-            nn.ReLU(inplace=True),
-            nn.Conv3d(conv_depth[1], conv_depth[2], kernel_size=3, padding=1),
-            nn.BatchNorm3d(conv_depth[2]),
-            nn.ReLU(inplace=True),
-            nn.Dropout3d(p=dropout),
-            nn.Conv3d(conv_depth[2], conv_depth[3], kernel_size=3, padding=1),
-            nn.BatchNorm3d(conv_depth[3]),
-            nn.ReLU(inplace=True),
-            nn.Dropout3d(p=dropout),
-            nn.Conv3d(conv_depth[3], conv_depth[4], kernel_size=3, padding=1),
+            nn.Conv3d(in_channels+conv_depth[3], conv_depth[4], kernel_size=3, padding=1),
             nn.BatchNorm3d(conv_depth[4]),
             nn.ReLU(inplace=True),
             nn.Dropout3d(p=dropout),
-            nn.Conv3d(conv_depth[4], out_channels, kernel_size=3, padding=1),
-            nn.BatchNorm3d(out_channels),
+            nn.Conv3d(conv_depth[4], conv_depth[5], kernel_size=3, padding=1),
+            nn.BatchNorm3d(conv_depth[5]),
             nn.ReLU(inplace=True),
-            nn.Conv3d(out_channels, out_channels, kernel_size=3, padding=1),
+            nn.Dropout3d(p=dropout),
+            nn.Conv3d(conv_depth[5], conv_depth[6], kernel_size=3, padding=1),
+            nn.BatchNorm3d(conv_depth[6]),
+            nn.ReLU(inplace=True),
+            nn.Dropout3d(p=dropout),
+            nn.Conv3d(conv_depth[6], conv_depth[7], kernel_size=3, padding=1),
+            nn.BatchNorm3d(conv_depth[7]),
+            nn.Dropout3d(p=dropout),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(conv_depth[7], conv_depth[8], kernel_size=3, padding=1),
+            nn.BatchNorm3d(conv_depth[8]),
+            nn.Dropout3d(p=dropout),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(conv_depth[8], conv_depth[9], kernel_size=3, padding=1),
+            nn.BatchNorm3d(conv_depth[9]),
+            nn.Dropout3d(p=dropout),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(conv_depth[9], out_channels, kernel_size=3, padding=1),
             nn.Tanh()
         ]
 

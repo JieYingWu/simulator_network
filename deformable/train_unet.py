@@ -20,8 +20,8 @@ from torchsummary import summary
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-FEM_WEIGHT = 1
-REG_WEIGHT = 1.0e-3
+FEM_WEIGHT = 1000
+REG_WEIGHT = 0.0001
 
 if __name__ == '__main__':
     
@@ -55,14 +55,14 @@ if __name__ == '__main__':
         val_label_path = val_label_path + [path+'/camera/' + v + '_filtered/']
         val_fem_path = train_fem_path + [path+'/simulator/5e3_data/' + v + '/']
 
-    epoch_to_use = 200
-    use_previous_model = True
+    epoch_to_use = 415
+    use_previous_model = False
     validate_each = 5
     play_each = 2000
     
     batch_size = 32
-    lr = 1.0e-6
-    n_epochs = 500
+    lr = 1.0e-4
+    n_epochs = 1000
     momentum=0.9
 
     base_mesh = np.genfromtxt('data6/position0000.txt')

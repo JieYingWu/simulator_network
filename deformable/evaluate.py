@@ -30,7 +30,6 @@ for i in range(len(mesh_files)):
 #    print(mesh[:,-1,:,1])
     mesh = mesh[:,-1,:,:]
 #    mesh = refine_mesh(mesh.unsqueeze(0), 3, device)
- 
     mesh = mesh.reshape(-1,3).unsqueeze(0).float().to(device)
 
     try:
@@ -40,7 +39,7 @@ for i in range(len(mesh_files)):
         exit()
     pc = torch.from_numpy(np.concatenate((np.expand_dims(pc['x'], 1), np.expand_dims(pc['y'],1), np.expand_dims(pc['z'],1)), 1)).unsqueeze(0).float().to(device)
     dist1, dist2, idx1, idx2 = loss_fn(mesh.contiguous(), pc.contiguous())
-#    print(dist2.mean())
+#    print(i,dist2.mean())
     loss += torch.mean(dist2) #dist[0]
 
 print(loss/len(mesh_files))
