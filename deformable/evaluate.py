@@ -28,9 +28,9 @@ for i in range(len(mesh_files)):
         exit()
     mesh = mesh.reshape(utils.VOL_SIZE)#.permute(3,0,1,2)
 #    print(mesh[:,-1,:,1])
-    mesh = mesh[:,-1,:,:]
-#    mesh = refine_mesh(mesh.unsqueeze(0), 3, device)
-    mesh = mesh.reshape(-1,3).unsqueeze(0).float().to(device)
+    mesh = mesh[:,-1,:,:].unsqueeze(0).to(device).float()
+#    mesh = utils.refine_mesh(mesh.permute((0,3,1,2)), 3, device).permute((0,2,3,1)) 
+    mesh = mesh.reshape(-1,3).unsqueeze(0)
 
     try:
         pc = plyfile.PlyData.read(gt_path + gt_files[i])['vertex']

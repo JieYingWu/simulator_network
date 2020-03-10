@@ -4,10 +4,10 @@ from torch import nn
 from datetime import datetime
 
 
-FIELDS = 6
+FIELDS = 10
 IN_CHANNELS = 3
 OUT_CHANNELS = 3
-DROPOUT = 0.1
+DROPOUT = 0#.1
 VOL_SIZE = (13,5,5,3)
 
 def init_net(net, type="kaiming", mode="fan_in", activation_mode="relu", distribution="normal"):
@@ -59,10 +59,10 @@ def reshape_volume(x):
     return y
 
 def refine_mesh(mesh, factor, device):
-    batch,z,x,y =  mesh.size()
+    batch,n,x,y =  mesh.size()
     new_x = (x-1)*factor+1
     new_y = (y-1)*factor+1
-    fine_mesh = torch.zeros([batch, z, new_x, new_y], device=device)
+    fine_mesh = torch.zeros([batch, n, new_x, new_y], device=device)
 
     # Fill out the rows 
     for b in range(batch):

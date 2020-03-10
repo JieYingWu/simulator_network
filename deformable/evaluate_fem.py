@@ -30,15 +30,15 @@ for i in range(len(mesh_files)-1):
 #    mesh = refine_mesh(mesh.unsqueeze(0), 3, device)
  
     try:
-        fem = np.genfromtxt(gt_path + gt_files[i+1])
+        fem = np.genfromtxt(gt_path + gt_files[i])
 #        mesh = np.genfromtxt(mesh_path + mesh_files[0])
         fem = torch.from_numpy(fem)
     except:
-        print("Can't find ", gt_files[i+1])
+        print("Can't find ", gt_files[i])
         exit()
     fem = fem.reshape(utils.VOL_SIZE)#.permute(3,0,1,2)
     cur_loss = loss_fn(mesh, fem)
     loss += cur_loss
-    #print(i, cur_loss)
+#    print(i, cur_loss)
     
 print(loss/len(mesh_files))

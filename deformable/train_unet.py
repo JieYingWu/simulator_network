@@ -1,3 +1,4 @@
+
 import tqdm
 import utils
 import numpy as np
@@ -31,14 +32,14 @@ if __name__ == '__main__':
     val_set = ['data0']
     # Testing on data1 and 2
     
-    path = '../../dataset/2019-10-09-reduced'
+    path = '../../dataset/2019-10-09-GelPhantom1'
     train_kinematics_path = []
     train_simulator_path = []
     train_label_path = []
     train_fem_path = []
     
     for v in train_set:
-        train_kinematics_path = train_kinematics_path + [path+'/dvrk/' + v + '.csv']
+        train_kinematics_path = train_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_velocity.csv']
         train_simulator_path = train_simulator_path + [v + '/']
         train_label_path = train_label_path + [path+'/camera/' + v + '_filtered/']
         train_fem_path = train_fem_path + [path+'/simulator/5e3_data/' + v + '/']
@@ -53,19 +54,19 @@ if __name__ == '__main__':
         val_kinematics_path = val_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_velocity.csv']
         val_simulator_path = val_simulator_path + [v + '/']
         val_label_path = val_label_path + [path+'/camera/' + v + '_filtered/']
-        val_fem_path = train_fem_path + [path+'/simulator/5e3_data/' + v + '/']
+        val_fem_path = val_fem_path + [path+'/simulator/5e3_data/' + v + '/']
 
-    epoch_to_use = 415
-    use_previous_model = False
+    epoch_to_use = 75
+    use_previous_model = True
     validate_each = 5
     play_each = 2000
     
     batch_size = 32
-    lr = 1.0e-4
+    lr = 1.0e-6
     n_epochs = 1000
     momentum=0.9
 
-    base_mesh = np.genfromtxt('data6/position0000.txt')
+    base_mesh = np.genfromtxt('../simulator/mesh.txt')
     base_mesh = torch.from_numpy(base_mesh).float()
     base_mesh = base_mesh.reshape(utils.VOL_SIZE).permute(3,0,1,2).unsqueeze(0)
 
@@ -145,7 +146,7 @@ if __name__ == '__main__':
                 pred = model(mesh, kinematics)
                 corrected = utils.correct(mesh, pred)
                 loss = loss_fn(corrected, pc, fem, pred)
-                epoch_loss += loss.item()
+                epoch_loss += np.mean(loss.item())
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -154,7 +155,12 @@ if __name__ == '__main__':
                 tq.update(batch_size)
                 tq.set_postfix(loss=' loss={:.5f}'.format(mean_loss))
                 step += 1
+                
+            tq.set_postfix(loss=' loss={:.5f}'.format(epoch_loss/len(train_loader)))
 
+            model_path = "augmentation_model.pt"
+            save(e, model, model_path, mean_loss, optimizer, scheduler)
+                
             if e % play_each == 0:
                 for idx in range(len(train_set)):
                     kinematics = torch.from_numpy(np.genfromtxt(train_kinematics_path[idx], delimiter=',')).float().to(device)
