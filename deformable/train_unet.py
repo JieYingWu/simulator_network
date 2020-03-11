@@ -62,7 +62,7 @@ if __name__ == '__main__':
     play_each = 2000
     
     batch_size = 32
-    lr = 1.0e-6
+    lr = 1.0e-7
     n_epochs = 1000
     momentum=0.9
 
@@ -81,7 +81,7 @@ if __name__ == '__main__':
 #    summary(model, input_size=(3, img_size[0], img_size[1], img_size[2]))
 
     base_mesh = base_mesh.to(device)
-    loss_fn = MeshLoss(FEM_WEIGHT, REG_WEIGHT,  base_mesh, device)
+    loss_fn = MeshLoss(FEM_WEIGHT, REG_WEIGHT, device)
     optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum) 
     scheduler = ReduceLROnPlateau(optimizer)
     

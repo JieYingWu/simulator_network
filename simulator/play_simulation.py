@@ -37,8 +37,8 @@ def play_simulation(net, mesh, robot_pos, folder_name):
             correction = correction + update
         network_correction = (correction / (ensemble_size+1)).detach()
         mesh = utils.correct(mesh, network_correction)
-        write_out = mesh.clone().cpu().numpy().reshape(3,-1).transpose()
-        np.savetxt(folder_name + "/position" + '%04d' % (i) + ".txt", write_out)
+#        write_out = mesh.clone().cpu().numpy().reshape(3,-1).transpose()
+#        np.savetxt(folder_name + "/position" + '%04d' % (i) + ".txt", write_out)
 
 if __name__ == "__main__":
 
