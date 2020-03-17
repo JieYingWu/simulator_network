@@ -80,15 +80,17 @@ class SimulatorDataset3D(Dataset):
     def __getitem__(self, idx):
         kinematics = self.kinematics_array[idx]
         
-#        if self.augment and self.net:
+        if self.augment and random.random() < 0.8:
+            simulation = utils.reshape_volume(np.genfromtxt(self.fem_array[idx]))
+            simulation = torch.from_numpy(simulation).float()
+            simulation = add_gaussian_noise(simulation)
+#        elif self.augment and self.net:
 #            value = random.randint(0, augment_steps)
 #            simulation = self.add_model_noise(idx, value)
-#        else:
-        simulation = utils.reshape_volume(np.genfromtxt(self.fem_array[idx]))
-        simulation = torch.from_numpy(simulation).float()
-     
-        if self.augment and random.random() < 0.8:
-            simulation = add_gaussian_noise(simulation)
+        else:
+            simulation = utils.reshape_volume(np.genfromtxt(self.fem_array[idx]))
+            simulation = torch.from_numpy(simulation).float()
+                        
 
         # Current point cloud
         # pc_last = plyfile.PlyData.read(self.label_array[idx])['vertex']

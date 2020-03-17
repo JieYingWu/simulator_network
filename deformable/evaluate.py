@@ -14,11 +14,12 @@ mesh_files = os.listdir(mesh_path)
 mesh_files = sorted(mesh_files)
 gt_files = sorted(os.listdir(gt_path))
 loss = 0
+loss_arr = np.zeros(len(mesh_files))
 loss_fn = ChamferDistance()
 
 #print('Using base mesh')
 print('Evaluating ', len(mesh_files), ' files')
-for i in range(len(mesh_files)):
+for i in range(len(mesh_files)-1):
     try:
         mesh = np.genfromtxt(mesh_path + mesh_files[i])
 #        mesh = np.genfromtxt(mesh_path + mesh_files[0])
@@ -33,13 +34,16 @@ for i in range(len(mesh_files)):
     mesh = mesh.reshape(-1,3).unsqueeze(0)
 
     try:
-        pc = plyfile.PlyData.read(gt_path + gt_files[i])['vertex']
+        pc = plyfile.PlyData.read(gt_path + gt_files[i+1])['vertex']
     except:
         print(i, ' is out of range')
         exit()
     pc = torch.from_numpy(np.concatenate((np.expand_dims(pc['x'], 1), np.expand_dims(pc['y'],1), np.expand_dims(pc['z'],1)), 1)).unsqueeze(0).float().to(device)
     dist1, dist2, idx1, idx2 = loss_fn(mesh.contiguous(), pc.contiguous())
 #    print(i,dist2.mean())
+    dist2 = torch.sqrt(dist2)
     loss += torch.mean(dist2) #dist[0]
-
+    loss_arr[i] = torch.mean(dist2)
+    
 print(loss/len(mesh_files))
+np.savetxt('loss.csv', loss_arr, delimiter=',')

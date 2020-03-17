@@ -37,8 +37,9 @@ def play_simulation(net, mesh, robot_pos, folder_name):
             correction = correction + update
         network_correction = (correction / (ensemble_size+1)).detach()
         mesh = utils.correct(mesh, network_correction)
-#        write_out = mesh.clone().cpu().numpy().reshape(3,-1).transpose()
-#        np.savetxt(folder_name + "/position" + '%04d' % (i) + ".txt", write_out)
+
+        write_out = mesh.clone().cpu().numpy().reshape(3,-1).transpose()
+        np.savetxt(folder_name + "/position" + '%04d' % (i) + ".txt", write_out)
 
 if __name__ == "__main__":
 
@@ -46,13 +47,13 @@ if __name__ == "__main__":
 
     ## Load kinematics ##
     folder_name = 'data' + str(data_file)
-    robot_pos = np.genfromtxt('../../dataset/2019-10-09-reduced/dvrk/' + folder_name  + '_robot_cartesian_velocity.csv', delimiter=',')
+    robot_pos = np.genfromtxt('../../dataset/2019-10-09-test/dvrk/' + folder_name  + '.csv', delimiter=',')
     robot_pos = torch.from_numpy(robot_pos).float().to(device)
 
     if len(sys.argv) == 2:
         network_path = Path('../deformable/augmentation_model.pt')
     elif len(sys.argv) == 3:
-        network_path = Path('../deformable/checkpoints/models/model_' + sys.argv[2] + '.pt')
+        network_path = Path('../deformable/checkpoints/alpha-500-models/model_' + sys.argv[2] + '.pt')
     else:
         print('Too many arguments')
         exit()
@@ -71,7 +72,10 @@ if __name__ == "__main__":
 
 
     ## Load mesh ##
-    simulator_file = 'mesh.txt'
-    mesh = torch.from_numpy(utils.reshape_volume(np.genfromtxt(simulator_file))).float().unsqueeze(0).to(device)
+    mesh_path = '../../dataset/2019-10-09-test/simulator/' + folder_name + '/'
+    mesh_files = os.listdir(mesh_path)
+    mesh_files = sorted(mesh_files)
+    base_mesh = mesh_path + mesh_files[0]
+    mesh = torch.from_numpy(utils.reshape_volume(np.genfromtxt(base_mesh))).float().unsqueeze(0).to(device)
 
     play_simulation(net, mesh, robot_pos, folder_name)

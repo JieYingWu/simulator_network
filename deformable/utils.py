@@ -7,7 +7,7 @@ from datetime import datetime
 FIELDS = 10
 IN_CHANNELS = 3
 OUT_CHANNELS = 3
-DROPOUT = 0#.1
+DROPOUT = 0#.01
 VOL_SIZE = (13,5,5,3)
 
 def init_net(net, type="kaiming", mode="fan_in", activation_mode="relu", distribution="normal"):

@@ -22,7 +22,7 @@ from torchsummary import summary
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 FEM_WEIGHT = 1000
-REG_WEIGHT = 0.0001
+REG_WEIGHT = 0.00001
 
 if __name__ == '__main__':
     
@@ -56,13 +56,13 @@ if __name__ == '__main__':
         val_label_path = val_label_path + [path+'/camera/' + v + '_filtered/']
         val_fem_path = val_fem_path + [path+'/simulator/5e3_data/' + v + '/']
 
-    epoch_to_use = 75
-    use_previous_model = True
+    epoch_to_use = 120
+    use_previous_model = False
     validate_each = 5
     play_each = 2000
     
     batch_size = 32
-    lr = 1.0e-7
+    lr = 1.0e-6
     n_epochs = 1000
     momentum=0.9
 
@@ -86,16 +86,17 @@ if __name__ == '__main__':
     scheduler = ReduceLROnPlateau(optimizer)
     
     try:
-        model_root = root / "models"
+        #model_root = root / "models"
+        model_root = root / "beta-1e-5"
         model_root.mkdir(mode=0o777, parents=False)
     except OSError:
         print("path exists")
 
-    try:
-        results_root = root / "results"
-        results_root.mkdir(mode=0o777, parents=False)
-    except OSError:
-        print("path exists")
+#    try:
+#        results_root = root / "results"
+#        results_root.mkdir(mode=0o777, parents=False)
+#    except OSError:
+#        print("path exists")
     
     # Read existing weights for both G and D models
     if use_previous_model:
@@ -187,9 +188,9 @@ if __name__ == '__main__':
                             mesh_plot = mesh.detach().cpu().numpy()
                             pred_plot = pred.detach().cpu().numpy()
                             label_plot = label.detach().cpu().numpy()
-                            np.save(str(results_root/'prediction_{e}'.format(e=e)), pred_plot)
-                            np.save(str(results_root/'mesh_{e}'.format(e=e)), mesh_plot)
-                            np.save(str(results_root/'label_{e}'.format(e=e)), label_plot)
+#                            np.save(str(results_root/'prediction_{e}'.format(e=e)), pred_plot)
+#                            np.save(str(results_root/'mesh_{e}'.format(e=e)), mesh_plot)
+#                            np.save(str(results_root/'label_{e}'.format(e=e)), label_plot)
 
                     
 #                for idx in range(len(val_set)):

@@ -15,7 +15,7 @@ mesh_files = os.listdir(mesh_path)
 mesh_files = sorted(mesh_files)
 gt_files = sorted(os.listdir(gt_path))
 loss = 0
-loss_fn = nn.MSELoss()
+loss_fn = nn.MSELoss(reduction='none')
 
 #print('Using base mesh')
 for i in range(len(mesh_files)-1):
@@ -38,6 +38,7 @@ for i in range(len(mesh_files)-1):
         exit()
     fem = fem.reshape(utils.VOL_SIZE)#.permute(3,0,1,2)
     cur_loss = loss_fn(mesh, fem)
+    cur_loss = torch.mean(torch.sqrt(cur_loss))
     loss += cur_loss
 #    print(i, cur_loss)
     
