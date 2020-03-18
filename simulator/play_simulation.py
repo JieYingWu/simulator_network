@@ -30,6 +30,9 @@ def play_simulation(net, mesh, robot_pos, folder_name):
     
     ## Run ##
     for i in range(steps):        
+        write_out = mesh.clone().cpu().numpy().reshape(3,-1).transpose()
+        np.savetxt(folder_name + "/position" + '%04d' % (i) + ".txt", write_out)
+
         cur_pos = robot_pos[i,1:utils.FIELDS+1].unsqueeze(0)
         correction = net(mesh, cur_pos)
         for j in range(ensemble_size):
@@ -38,8 +41,6 @@ def play_simulation(net, mesh, robot_pos, folder_name):
         network_correction = (correction / (ensemble_size+1)).detach()
         mesh = utils.correct(mesh, network_correction)
 
-        write_out = mesh.clone().cpu().numpy().reshape(3,-1).transpose()
-        np.savetxt(folder_name + "/position" + '%04d' % (i) + ".txt", write_out)
 
 if __name__ == "__main__":
 
@@ -53,7 +54,7 @@ if __name__ == "__main__":
     if len(sys.argv) == 2:
         network_path = Path('../deformable/augmentation_model.pt')
     elif len(sys.argv) == 3:
-        network_path = Path('../deformable/checkpoints/alpha-500-models/model_' + sys.argv[2] + '.pt')
+        network_path = Path('../deformable/checkpoints/full-model-working/model_' + sys.argv[2] + '.pt')
     else:
         print('Too many arguments')
         exit()
