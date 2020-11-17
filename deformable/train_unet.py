@@ -1,4 +1,3 @@
-
 import tqdm
 import utils
 import numpy as np
@@ -86,8 +85,8 @@ if __name__ == '__main__':
     scheduler = ReduceLROnPlateau(optimizer)
     
     try:
-        #model_root = root / "models"
-        model_root = root / "beta-1e-5"
+        model_root = root / "models"
+#        model_root = root / "beta-1e-5"
         model_root.mkdir(mode=0o777, parents=False)
     except OSError:
         print("path exists")

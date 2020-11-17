@@ -47,8 +47,9 @@ if __name__ == "__main__":
     data_file = sys.argv[1]
 
     ## Load kinematics ##
+    base_dir = '../../dataset/2019-10-09-GelPhantom1/'
     folder_name = 'data' + str(data_file)
-    robot_pos = np.genfromtxt('../../dataset/2019-10-09-test/dvrk/' + folder_name  + '.csv', delimiter=',')
+    robot_pos = np.genfromtxt(base_dir + 'dvrk/' + folder_name  + '_robot_cartesian_velocity.csv', delimiter=',')
     robot_pos = torch.from_numpy(robot_pos).float().to(device)
 
     if len(sys.argv) == 2:
@@ -73,10 +74,10 @@ if __name__ == "__main__":
 
 
     ## Load mesh ##
-    mesh_path = '../../dataset/2019-10-09-test/simulator/' + folder_name + '/'
-    mesh_files = os.listdir(mesh_path)
-    mesh_files = sorted(mesh_files)
-    base_mesh = mesh_path + mesh_files[0]
+#    mesh_path = base_dir + '/simulator/' + folder_name + '/'
+#    mesh_files = os.listdir(mesh_path)
+#    mesh_files = sorted(mesh_files)
+    base_mesh = 'mesh.txt'#mesh_path + mesh_files[0]
     mesh = torch.from_numpy(utils.reshape_volume(np.genfromtxt(base_mesh))).float().unsqueeze(0).to(device)
 
     play_simulation(net, mesh, robot_pos, folder_name)
