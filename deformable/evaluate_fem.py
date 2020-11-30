@@ -18,7 +18,7 @@ loss = 0
 loss_fn = nn.MSELoss(reduction='none')
 
 #print('Using base mesh')
-for i in range(len(mesh_files)-1):
+for i in range(len(mesh_files)-2):
     try:
         mesh = np.genfromtxt(mesh_path + mesh_files[i])
 #        mesh = np.genfromtxt(mesh_path + mesh_files[0])
@@ -34,6 +34,7 @@ for i in range(len(mesh_files)-1):
 #        mesh = np.genfromtxt(mesh_path + mesh_files[0])
         fem = torch.from_numpy(fem)
     except:
+        print("Index is ", i)
         print("Can't find ", gt_files[i])
         exit()
     fem = fem.reshape(utils.VOL_SIZE)#.permute(3,0,1,2)

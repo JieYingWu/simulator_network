@@ -79,7 +79,7 @@ class SimuAttentionNet(nn.Module):
 #        self.pc_layers = PointNetfeat()
 #        self.pc_pos_layers = PointNetfeat(conv_depth=(64,128,325))
         pos_layers = [
-            nn.Conv3d(in_channels+4, conv_depth[0], kernel_size=3, padding=1),
+            nn.Conv3d(in_channels, conv_depth[0], kernel_size=3, padding=1),
             nn.BatchNorm3d(conv_depth[0]),
             nn.ReLU(inplace=True),
             nn.Conv3d(conv_depth[0], conv_depth[1], kernel_size=3, padding=1),
@@ -136,14 +136,14 @@ class SimuAttentionNet(nn.Module):
             nn.BatchNorm3d(conv_depth[7]),
             nn.Dropout3d(p=dropout),
             nn.ReLU(inplace=True),
-            nn.Conv3d(conv_depth[7], conv_depth[8], kernel_size=3, padding=1),
-            nn.BatchNorm3d(conv_depth[8]),
-            nn.Dropout3d(p=dropout),
-            nn.ReLU(inplace=True),
-            nn.Conv3d(conv_depth[8], conv_depth[9], kernel_size=3, padding=1),
-            nn.BatchNorm3d(conv_depth[9]),
-            nn.Dropout3d(p=dropout),
-            nn.ReLU(inplace=True),
+#            nn.Conv3d(conv_depth[7], conv_depth[8], kernel_size=3, padding=1),
+#            nn.BatchNorm3d(conv_depth[8]),
+#            nn.Dropout3d(p=dropout),
+#            nn.ReLU(inplace=True),
+#            nn.Conv3d(conv_depth[8], conv_depth[9], kernel_size=3, padding=1),
+#            nn.BatchNorm3d(conv_depth[9]),
+#            nn.Dropout3d(p=dropout),
+#            nn.ReLU(inplace=True),
             # nn.Conv3d(conv_depth[9], conv_depth[10], kernel_size=3, padding=1),
             # nn.BatchNorm3d(conv_depth[10]),
             # nn.ReLU(inplace=True),
@@ -152,7 +152,7 @@ class SimuAttentionNet(nn.Module):
             # nn.BatchNorm3d(conv_depth[11]),
             # nn.ReLU(inplace=True),
             # nn.Dropout3d(p=dropout),
-            nn.Conv3d(conv_depth[9], out_channels, kernel_size=3, padding=1),
+            nn.Conv3d(conv_depth[7], out_channels, kernel_size=3, padding=1),
             nn.Tanh()
         ]
 
@@ -170,7 +170,7 @@ class SimuAttentionNet(nn.Module):
 #        pc_pos = pc_pos.reshape(pc_pos.size()[0], 1, 13, 5 ,5)
 #        pc_pos = pc_pos.repeat(1, 64, 1, 1, 1)
         
-        pos = kinematics[:,0:7].unsqueeze(2).unsqueeze(3).unsqueeze(4)
+        pos = kinematics[:,0:3].unsqueeze(2).unsqueeze(3).unsqueeze(4)
         pos = pos.repeat(1, 1, x.size()[2], x.size()[3], x.size()[4])
         pos_features = self.pos_layers(pos)
         

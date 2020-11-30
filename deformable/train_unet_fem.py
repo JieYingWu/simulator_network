@@ -2,7 +2,7 @@ import tqdm
 import utils
 import numpy as np
 from pathlib import Path
-from dataset import SimulatorDataset3D
+from dataset import SimulatorDataset
 
 from model import UNet3D, SimuNet, SimuNetWithSurface, SimuAttentionNet
 from loss import MeshLoss
@@ -21,13 +21,13 @@ from torchsummary import summary
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 FEM_WEIGHT = 1000
-REG_WEIGHT = 0.00001
+REG_WEIGHT = 0.000001
 
 if __name__ == '__main__':
     
     root = Path("checkpoints")
     num_workers = 6
-    train_set = [ 'data2', 'data3', 'data4', 'data5',  'data6', 'data7', 'data8', 'data9']#, 'data10', 'data11']
+    train_set = [ 'data2', 'data3', 'data4', 'data5',  'data6', 'data7', 'data8']#, 'data9', 'data10', 'data11']
     val_set = ['data0']
     # Testing on data1
     
@@ -40,7 +40,6 @@ if __name__ == '__main__':
     for v in train_set:
         train_kinematics_path = train_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_velocity.csv']
         train_simulator_path = train_simulator_path + [v + '/']
-        train_label_path = train_label_path + [path+'/camera/' + v + '_filtered/']
         train_fem_path = train_fem_path + [path+'/simulator/5e3_fine_mesh/' + v + '/']
 
     print(train_kinematics_path)
@@ -52,16 +51,15 @@ if __name__ == '__main__':
     for v in val_set:
         val_kinematics_path = val_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_velocity.csv']
         val_simulator_path = val_simulator_path + [v + '/']
-        val_label_path = val_label_path + [path+'/camera/' + v + '_filtered/']
         val_fem_path = val_fem_path + [path+'/simulator/5e3_fine_mesh/' + v + '/']
 
-    epoch_to_use = 125
-    use_previous_model = True
+    epoch_to_use = 120
+    use_previous_model = False
     validate_each = 5
     play_each = 2000
     
-    batch_size = 64
-    lr = 1.0e-8
+    batch_size = 128
+    lr = 1.0e-7
     n_epochs = 1000
     momentum=0.9
 
@@ -69,8 +67,8 @@ if __name__ == '__main__':
     base_mesh = torch.from_numpy(base_mesh).float()
     base_mesh = base_mesh.reshape(utils.VOL_SIZE).permute(3,0,1,2).unsqueeze(0)
 
-    train_dataset = SimulatorDataset3D(train_kinematics_path, train_simulator_path, train_label_path, train_fem_path, augment=True)
-    val_dataset = SimulatorDataset3D(val_kinematics_path, val_simulator_path, val_label_path, val_fem_path, augment=False)
+    train_dataset = SimulatorDataset(train_kinematics_path, train_simulator_path, train_fem_path, augment=True)
+    val_dataset = SimulatorDataset(val_kinematics_path, val_simulator_path, val_fem_path, augment=False)
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     
@@ -126,7 +124,7 @@ if __name__ == '__main__':
         'scheduler': scheduler.state_dict()
     }, str(model_path))
 
-    print('In train_unet.py, using 3 losses: Chamfer, FEM L2 and regularization')
+    print('In train_unet.py, using 2 losses: FEM L2 and regularization')
     
     try:    
         for e in range(epoch, n_epochs + 1):
@@ -138,14 +136,11 @@ if __name__ == '__main__':
             epoch_loss = 0
             train_dataset.__set_network__()
 
-            for i, (kinematics, mesh, pc, fem) in enumerate(train_loader):
-                kinematics, mesh, pc, fem = kinematics.to(device), mesh.to(device), pc.to(device), fem.to(device)
-#            for i, (kinematics, mesh, pc, fem, pc_last) in enumerate(train_loader):
-#                kinematics, mesh, pc, fem, pc_last = kinematics.to(device), mesh.to(device), pc.to(device), fem.to(device), pc_last.to(device)
-#                mesh_kinematics = utils.concat_mesh_kinematics(mesh, kinematics)
+            for i, (kinematics, mesh, fem) in enumerate(train_loader):
+                kinematics, mesh, fem = kinematics.to(device), mesh.to(device), fem.to(device)
                 pred = model(mesh, kinematics)
                 corrected = utils.correct(mesh, pred)
-                loss = loss_fn(corrected, pc, fem, pred)
+                loss = loss_fn(corrected, pc=None, fem_mesh=fem, pred=pred)
                 epoch_loss += np.mean(loss.item())
 
                 optimizer.zero_grad()
@@ -173,23 +168,18 @@ if __name__ == '__main__':
                         m.eval()
                 all_val_loss = []
                 with torch.no_grad():
-                    for j, (kinematics, mesh, pc, fem) in enumerate(val_loader):
-                        kinematics, mesh, pc, fem = kinematics.to(device), mesh.to(device), pc.to(device), fem.to(device)
-#                    for j, (kinematics, mesh, pc, fem, pc_last) in enumerate(val_loader):
-#                        kinematics, mesh, pc, fem, pc_last = kinematics.to(device), mesh.to(device), pc.to(device), fem.to(device), pc_last.to(device)
-#                        mesh_kinematics = utils.concat_mesh_kinematics(mesh, kinematics)
+                    for j, (kinematics, mesh, fem) in enumerate(val_loader):
+                        kinematics, mesh, fem = kinematics.to(device), mesh.to(device), fem.to(device)
                         pred = model(mesh, kinematics)
                         corrected = utils.correct(mesh, pred)
-                        loss = loss_fn(corrected, pc, fem, pred)
+                        loss = loss_fn(corrected, pc=None, fem_mesh=fem, pred=pred)
                         all_val_loss.append(loss.item())
 
                         if (j == 500):
                             mesh_plot = mesh.detach().cpu().numpy()
                             pred_plot = pred.detach().cpu().numpy()
-                            label_plot = label.detach().cpu().numpy()
 #                            np.save(str(results_root/'prediction_{e}'.format(e=e)), pred_plot)
 #                            np.save(str(results_root/'mesh_{e}'.format(e=e)), mesh_plot)
-#                            np.save(str(results_root/'label_{e}'.format(e=e)), label_plot)
 
                     
 #                for idx in range(len(val_set)):

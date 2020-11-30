@@ -55,7 +55,7 @@ if __name__ == "__main__":
     if len(sys.argv) == 2:
         network_path = Path('../deformable/augmentation_model.pt')
     elif len(sys.argv) == 3:
-        network_path = Path('../deformable/checkpoints/full-model-working/model_' + sys.argv[2] + '.pt')
+        network_path = Path('../deformable/checkpoints/models/model_' + sys.argv[2] + '.pt')
     else:
         print('Too many arguments')
         exit()
@@ -69,6 +69,7 @@ if __name__ == "__main__":
         print('Restored model')
     else:
         print('Failed to restore model')
+        print(network_path)
 #        exit()
         net = net.to(device)
 
@@ -77,7 +78,7 @@ if __name__ == "__main__":
 #    mesh_path = base_dir + '/simulator/' + folder_name + '/'
 #    mesh_files = os.listdir(mesh_path)
 #    mesh_files = sorted(mesh_files)
-    base_mesh = 'mesh.txt'#mesh_path + mesh_files[0]
+    base_mesh = 'mesh_fine.txt'#mesh_path + mesh_files[0]
     mesh = torch.from_numpy(utils.reshape_volume(np.genfromtxt(base_mesh))).float().unsqueeze(0).to(device)
 
     play_simulation(net, mesh, robot_pos, folder_name)
