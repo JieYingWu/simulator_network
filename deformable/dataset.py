@@ -4,13 +4,13 @@ import torch
 import random
 import plyfile
 import numpy as np
-from model import SimuNet, UNet3D, SimuAttentionNet
+from model import UNet3D, SimuAttentionNet
 from pathlib import Path
 from torch.utils.data import Dataset
 
-augment_steps = 1.0
+augment_steps = 1
+scale = utils.scale_cpu[0,:,0,0,0].numpy()/32
 
-scale = torch.tensor([5.28, 7.16, 7.86])/16
 def add_gaussian_noise(mesh):
     x = torch.empty(mesh.size()[1:]).normal_(mean=0,std=scale[0]).unsqueeze(0)
     y = torch.empty(mesh.size()[1:]).normal_(mean=0,std=scale[1]).unsqueeze(0)
@@ -19,37 +19,28 @@ def add_gaussian_noise(mesh):
 
 #    kn_noise = torch.cat((torch.empty(3).normal_(mean=0, std=2), torch.empty(4).normal_(mean=0, std=0.1)))
     return mesh + modifier#, kinematics + kn_noise
-    
-class SimulatorDataset3D(Dataset):
-    def __init__(self, kinematics_path, simulator_path, label_path, fem_path, augment=False, pc_length=26000):
-        self.pc_length = pc_length
+
+class SimulatorDataset(Dataset):
+    def __init__(self, kinematics_path, simulator_path, fem_path, augment=False):
         self.augment= augment
         self.kinematics_array = None
         for path in kinematics_path:
             if self.kinematics_array is None:
-                self.kinematics_array = np.genfromtxt(path, delimiter=',')[:,1:utils.FIELDS+1]
+                self.kinematics_array = np.genfromtxt(path, delimiter=',')[0:-1,1:utils.FIELDS+1]
             else:
-                self.kinematics_array = np.concatenate((self.kinematics_array, np.genfromtxt(path, delimiter=',')[:,1:utils.FIELDS+1]))
+                self.kinematics_array = np.concatenate((self.kinematics_array, np.genfromtxt(path, delimiter=',')[0:-1,1:utils.FIELDS+1]))
+        self.kinematics_array = np.concatenate((self.kinematics_array[:,0:3], self.kinematics_array[:,7:10]), axis=1)
         self.kinematics_array = torch.from_numpy(self.kinematics_array).float()
                 
-#        self.simulator_array = []
-#        for path in simulator_path:
-#            files = sorted(os.listdir(path))
-#            self.simulator_array = self.simulator_array + [path + x for x in files]
-
-        self.label_array = []
-        for path in label_path:
-            files = sorted(os.listdir(path))
-            self.label_array = self.label_array + [path + x for x in files]
-            
         self.fem_array = []
         for path in fem_path:
             files = sorted(os.listdir(path))
             self.fem_array = self.fem_array + [path + x for x in files]
 
+        print(self.kinematics_array.shape, len(self.fem_array))
     def __set_network__(self):
         network_path = Path('augmentation_model.pt')
-        self.net = SimuAttentionNet(in_channels=utils.IN_CHANNELS, out_channels=utils.OUT_CHANNELS, dropout=utils.DROPOUT)
+        self.net = UNet3D(in_channels=utils.IN_CHANNELS, out_channels=utils.OUT_CHANNELS)
         # Load previous model if requested
         if network_path.exists():
             state = torch.load(str(network_path))
@@ -72,7 +63,7 @@ class SimulatorDataset3D(Dataset):
         for i in range(steps,0,-1):
             kinematics_prev = self.kinematics_array[idx-i].unsqueeze(0)
             correction = self.net(simulation_prev, kinematics_prev).detach()
-            simulation_prev = utils.correct_cpu(simulation_prev, correction)
+            simulation_prev = utils.correct_cpu(simulation_prev, correction)+simulation_prev
 
         return simulation_prev.squeeze(0)
     
@@ -80,17 +71,36 @@ class SimulatorDataset3D(Dataset):
     def __getitem__(self, idx):
         kinematics = self.kinematics_array[idx]
         
-        if self.augment and random.random() < 0.8:
-            simulation = utils.reshape_volume(np.genfromtxt(self.fem_array[idx]))
-            simulation = torch.from_numpy(simulation).float()
-            simulation = add_gaussian_noise(simulation)
-#        elif self.augment and self.net:
-#            value = random.randint(0, augment_steps)
-#            simulation = self.add_model_noise(idx, value)
+        if self.augment and random.random() < 0.3:
+            fem = utils.reshape_volume(np.genfromtxt(self.fem_array[idx]))
+            fem = torch.from_numpy(fem).float()
+            fem = add_gaussian_noise(fem)
+        elif self.augment and self.net and random.random() < 0.5:
+            value = random.randint(0, augment_steps)
+            fem = self.add_model_noise(idx, value)
         else:
-            simulation = utils.reshape_volume(np.genfromtxt(self.fem_array[idx]))
-            simulation = torch.from_numpy(simulation).float()
-                        
+            fem = utils.reshape_volume(np.genfromtxt(self.fem_array[idx]))
+            fem = torch.from_numpy(fem).float()
+
+        fem_next = torch.from_numpy(utils.reshape_volume(np.genfromtxt(self.fem_array[idx+1]))).float() - fem
+        return kinematics, fem, fem_next#, pc_last
+
+
+class SimulatorDatasetPC(SimulatorDataset):
+    def __init__(self, kinematics_path, simulator_path, label_path, fem_path, augment=False, pc_length=26000):
+        super(SimulatorDatasetPC, self).__init__(kinematics_path, simulator_path, label_path, fem_path, augment=False)
+        self.pc_length = pc_length
+
+        self.label_array = []
+        for path in label_path:
+            files = sorted(os.listdir(path))
+            self.label_array = self.label_array + [path + x for x in files]
+                
+    # return robot kinematics, mesh, and point cloud
+    def __getitem__(self, idx):
+        kinematics = self.kinematics_array[idx]
+        
+        kinematics, simulation, fem = super(SimulatorDatasetPC, self).__getitem__(idx)
 
         # Current point cloud
         # pc_last = plyfile.PlyData.read(self.label_array[idx])['vertex']
@@ -108,74 +118,7 @@ class SimulatorDataset3D(Dataset):
         pc = pc[indices[0:self.pc_length], :]
         pc = torch.from_numpy(np.transpose(pc, (1,0))).float()
 
-        fem = torch.from_numpy(utils.reshape_volume(np.genfromtxt(self.fem_array[idx+1]))).float()
-
         return kinematics, simulation, pc, fem#, pc_last
-
-class SimulatorDataset(Dataset):
-    def __init__(self, kinematics_path, simulator_path, fem_path, augment=False):
-        self.augment= augment
-        self.kinematics_array = None
-        for path in kinematics_path:
-            if self.kinematics_array is None:
-                self.kinematics_array = np.genfromtxt(path, delimiter=',')[:,1:utils.FIELDS+1]
-            else:
-                self.kinematics_array = np.concatenate((self.kinematics_array, np.genfromtxt(path, delimiter=',')[:,1:utils.FIELDS+1]))
-        self.kinematics_array = torch.from_numpy(self.kinematics_array).float()
-                
-        self.fem_array = []
-        for path in fem_path:
-            files = sorted(os.listdir(path))
-            self.fem_array = self.fem_array + [path + x for x in files]
-
-    def __set_network__(self):
-        network_path = Path('augmentation_model.pt')
-        self.net = SimuAttentionNet(in_channels=utils.IN_CHANNELS, out_channels=utils.OUT_CHANNELS, dropout=utils.DROPOUT)
-        # Load previous model if requested
-        if network_path.exists():
-            state = torch.load(str(network_path))
-            self.net.load_state_dict(state['model'])
-#            print('Restored model')
-        else:
-            print('Failed to restore model for augmentation')
-            self.net = False
-            
-    def __len__(self):
-        return len(self.fem_array)-1
-
-    def add_model_noise(self, idx, steps):
-        if idx < steps:
-            idx = steps
-            
-        simulation_prev = utils.reshape_volume(np.genfromtxt(self.fem_array[idx - steps]))
-        simulation_prev = torch.from_numpy(simulation_prev).float().unsqueeze(0)
-
-        for i in range(steps,0,-1):
-            kinematics_prev = self.kinematics_array[idx-i].unsqueeze(0)
-            correction = self.net(simulation_prev, kinematics_prev).detach()
-            simulation_prev = utils.correct_cpu(simulation_prev, correction)
-
-        return simulation_prev.squeeze(0)
-    
-    # return robot kinematics, mesh, and point cloud
-    def __getitem__(self, idx):
-        kinematics = self.kinematics_array[idx]
-        
-        if self.augment and random.random() < 0.8:
-            simulation = utils.reshape_volume(np.genfromtxt(self.fem_array[idx]))
-            simulation = torch.from_numpy(simulation).float()
-            simulation = add_gaussian_noise(simulation)
-#        elif self.augment and self.net:
-#            value = random.randint(0, augment_steps)
-#            simulation = self.add_model_noise(idx, value)
-        else:
-            simulation = utils.reshape_volume(np.genfromtxt(self.fem_array[idx]))
-            simulation = torch.from_numpy(simulation).float()
-
-        fem = torch.from_numpy(utils.reshape_volume(np.genfromtxt(self.fem_array[idx+1]))).float()
-
-        return kinematics, simulation,  fem#, pc_last
-
     
 class SimulatorDataset2D(Dataset):
     def __init__(self, kinematics_path, simulator_path, label_path, augment=False, pc_length=30000):

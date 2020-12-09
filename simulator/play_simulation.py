@@ -8,7 +8,7 @@ sys.path.insert(0,'../processing/')
 sys.path.insert(0,'../deformable/')
 import utils
 import geometry_util as geo
-from model import UNet3D, SimuNet, SimuNetWithSurface, SimuAttentionNet
+from model import UNet3D, SimuNetWithSurface, SimuAttentionNet
 import random
 import plyfile
 
@@ -33,13 +33,13 @@ def play_simulation(net, mesh, robot_pos, folder_name):
         write_out = mesh.clone().cpu().numpy().reshape(3,-1).transpose()
         np.savetxt(folder_name + "/position" + '%04d' % (i) + ".txt", write_out)
 
-        cur_pos = robot_pos[i,1:utils.FIELDS+1].unsqueeze(0)
+        cur_pos = robot_pos[i,:].unsqueeze(0)
         correction = net(mesh, cur_pos)
         for j in range(ensemble_size):
             update = net(mesh, cur_pos)
             correction = correction + update
         network_correction = (correction / (ensemble_size+1)).detach()
-        mesh = utils.correct(mesh, network_correction)
+        mesh = mesh + utils.correct(mesh, network_correction)
 
 
 if __name__ == "__main__":
@@ -50,8 +50,8 @@ if __name__ == "__main__":
     base_dir = '../../dataset/2019-10-09-GelPhantom1/'
     folder_name = 'data' + str(data_file)
     robot_pos = np.genfromtxt(base_dir + 'dvrk/' + folder_name  + '_robot_cartesian_velocity.csv', delimiter=',')
+    robot_pos = np.concatenate((robot_pos[:,1:4], robot_pos[:,8:11]), axis=1)
     robot_pos = torch.from_numpy(robot_pos).float().to(device)
-
     if len(sys.argv) == 2:
         network_path = Path('../deformable/augmentation_model.pt')
     elif len(sys.argv) == 3:
@@ -60,7 +60,7 @@ if __name__ == "__main__":
         print('Too many arguments')
         exit()
     
-    net = SimuAttentionNet(in_channels=utils.IN_CHANNELS, out_channels=utils.OUT_CHANNELS, dropout=utils.DROPOUT)
+    net = UNet3D(in_channels=utils.IN_CHANNELS, out_channels=utils.OUT_CHANNELS)
     # Load previous model if requested
     if network_path.exists():
         state = torch.load(str(network_path))

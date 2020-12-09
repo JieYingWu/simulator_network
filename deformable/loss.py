@@ -37,24 +37,24 @@ class MeshLoss(nn.Module):
         self.reg_weight = reg_weight
         self.reg_fn = RegularizationLoss()
 
-    def forward(self, network_mesh, pc, fem_mesh, pred):
+    def forward(self, pred, pc, fem_mesh):
 
-        if pc is not None:
-            # Match the top, camera observed layer
-            top = network_mesh[:,:,:,-1,:]
-            #        top = refine_mesh(top, 3, self.device)
-            top = top.reshape(top.size()[0],top.size()[1],-1)
+        # if pc is not None:
+        #     # Match the top, camera observed layer
+        #     top = network_mesh[:,:,:,-1,:]
+        #     #        top = refine_mesh(top, 3, self.device)
+        #     top = top.reshape(top.size()[0],top.size()[1],-1)
         
-            pc = pc.permute(0,2,1).contiguous()
-            top = top.permute(0,2,1).contiguous()
-            dist1, dist2, idx1, idx2 = self.chamfer(top, pc)
-        else:
-            dist2 = torch.zeros(1)
+        #     pc = pc.permute(0,2,1).contiguous()
+        #     top = top.permute(0,2,1).contiguous()
+        #     dist1, dist2, idx1, idx2 = self.chamfer(top, pc)
+        # else:
+        #     dist2 = torch.zeros(1)
 
-        fem_loss = self.fem_loss_fn(network_mesh, fem_mesh)
+        fem_loss = self.fem_loss_fn(pred, fem_mesh)
         regularization = self.reg_fn(pred)
         # Only want pc -> mesh loss to ignore occluded regions
-        loss = fem_loss*self.fem_weight + regularization*self.reg_weight + torch.mean(dist2)# + torch.mean(dist1)
+        loss = fem_loss*self.fem_weight + regularization*self.reg_weight# + torch.mean(dist2)# + torch.mean(dist1)
         #print(fem_loss, regularization, torch.mean(dist2))
 #        print(torch.mean(dist2), fem_loss)
         return loss

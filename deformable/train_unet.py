@@ -21,13 +21,13 @@ from torchsummary import summary
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 FEM_WEIGHT = 1000
-REG_WEIGHT = 0.00001
+REG_WEIGHT = #0.00001
 
 if __name__ == '__main__':
     
     root = Path("checkpoints")
     num_workers = 6
-    train_set = [ 'data2', 'data3', 'data4', 'data5',  'data6', 'data7', 'data8', 'data9']#, 'data10', 'data11']
+    train_set = [ 'data2']#, 'data3', 'data4', 'data5',  'data6', 'data7', 'data8', 'data9']#, 'data10', 'data11']
     val_set = ['data0']
     # Testing on data1
     
@@ -175,26 +175,10 @@ if __name__ == '__main__':
                 with torch.no_grad():
                     for j, (kinematics, mesh, pc, fem) in enumerate(val_loader):
                         kinematics, mesh, pc, fem = kinematics.to(device), mesh.to(device), pc.to(device), fem.to(device)
-#                    for j, (kinematics, mesh, pc, fem, pc_last) in enumerate(val_loader):
-#                        kinematics, mesh, pc, fem, pc_last = kinematics.to(device), mesh.to(device), pc.to(device), fem.to(device), pc_last.to(device)
-#                        mesh_kinematics = utils.concat_mesh_kinematics(mesh, kinematics)
                         pred = model(mesh, kinematics)
                         corrected = utils.correct(mesh, pred)
                         loss = loss_fn(corrected, pc, fem, pred)
                         all_val_loss.append(loss.item())
-
-                        if (j == 500):
-                            mesh_plot = mesh.detach().cpu().numpy()
-                            pred_plot = pred.detach().cpu().numpy()
-                            label_plot = label.detach().cpu().numpy()
-#                            np.save(str(results_root/'prediction_{e}'.format(e=e)), pred_plot)
-#                            np.save(str(results_root/'mesh_{e}'.format(e=e)), mesh_plot)
-#                            np.save(str(results_root/'label_{e}'.format(e=e)), label_plot)
-
-                    
-#                for idx in range(len(val_set)):
-#                    kinematics = torch.from_numpy(np.genfromtxt(val_kinematics_path[idx], delimite#r=',')).float().to(device)
-#                    play_simulation(model, base_mesh, kinematics, val_set[idx])
             
                 mean_loss = np.mean(all_val_loss)
                 tq.set_postfix(loss='validation loss={:5f}'.format(mean_loss))

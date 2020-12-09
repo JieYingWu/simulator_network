@@ -32,18 +32,19 @@ def kaiming_weight_zero_bias(model, mode="fan_in", activation_mode="relu", distr
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 scale = torch.zeros((1,3,1,1,1), device=device)
-scale[0,:,0,0,0] = torch.tensor([2.34, 3.98, 4.37])/4
+scale[0,:,0,0,0] = torch.tensor([2.34, 3.98, 4.37])
 def correct(mesh,x):
+    x = x - 0.5
     x = x*scale
-    corrected = mesh + x
-    return corrected
+#    corrected = mesh + x
+    return x#corrected
 
-scale_cpu = torch.zeros((1,3,1,1,1))
-scale_cpu[0,:,0,0,0] = torch.tensor([2.34, 3.98, 4.37])/4
+scale_cpu = scale.cpu()
 def correct_cpu(mesh,x):
+    x = x - 0.5
     x = x*scale_cpu
-    corrected = mesh + x
-    return corrected
+#    corrected = mesh + x
+    return x#corrected
 
 def concat_mesh_kinematics(mesh, kinematics):
     kinematics = kinematics.view(kinematics.size()[0], kinematics.size()[1],1,1,1)
