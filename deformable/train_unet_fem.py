@@ -21,7 +21,7 @@ from torchsummary import summary
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 FEM_WEIGHT = 1000
-REG_WEIGHT = 1.0e-6
+REG_WEIGHT = 0#1.0e-6
 
 if __name__ == '__main__':
     
@@ -33,24 +33,20 @@ if __name__ == '__main__':
     
     path = '../../dataset/2019-10-09-GelPhantom1'
     train_kinematics_path = []
-    train_simulator_path = []
     train_label_path = []
     train_fem_path = []
     
     for v in train_set:
         train_kinematics_path = train_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_velocity.csv']
-        train_simulator_path = train_simulator_path + [v + '/']
         train_fem_path = train_fem_path + [path+'/simulator/5e3_fine_mesh/' + v + '/']
 
     print(train_kinematics_path)
     val_kinematics_path = []
-    val_simulator_path = []
     val_label_path = []
     val_fem_path = []
 
     for v in val_set:
         val_kinematics_path = val_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_velocity.csv']
-        val_simulator_path = val_simulator_path + [v + '/']
         val_fem_path = val_fem_path + [path+'/simulator/5e3_fine_mesh/' + v + '/']
 
     epoch_to_use = 200
@@ -59,13 +55,13 @@ if __name__ == '__main__':
     play_each = 2000
     
     batch_size = 128
-    lr = 1.0e-5
+    lr = 1.0e-6
     n_epochs = 2000
     momentum=0.9
 
-    train_dataset = SimulatorDataset(train_kinematics_path, train_simulator_path, train_fem_path, augment=False)
-    val_dataset = SimulatorDataset(val_kinematics_path, val_simulator_path, val_fem_path, augment=False)
-    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
+    train_dataset = SimulatorDataset(train_kinematics_path, train_fem_path, augment=False)
+    val_dataset = SimulatorDataset(val_kinematics_path, val_fem_path, augment=False)
+    train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     
     model = UNet3D(in_channels=utils.IN_CHANNELS, out_channels=utils.OUT_CHANNELS).to(device)

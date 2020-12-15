@@ -198,10 +198,10 @@ class UNet3D(nn.Module):
         self.inc = inconv3D(in_channels, 64)
         self.down1 = down3D(64, 128)
         self.down2 = down3D(128, 256)
-        self.kinematics_layers = kinematics_layers(6, 1536)
+        self.kinematics_layers = kinematics_layers(6, 72)
 #        self.down3 = down3D(256, 256)
 #        self.up2 = up3D(522, 128)
-        self.up3 = upSpecial(448, 64)
+        self.up3 = upSpecial(384, 64)
         self.up4 = up3D(128, 64)
         self.outc = outconv3D(64, out_channels)
 
@@ -212,7 +212,7 @@ class UNet3D(nn.Module):
 #        x4 = self.down3(x3)
         
         k = self.kinematics_layers(kinematics)
-        k = k.reshape(k.size()[0],64,6,2,2)
+        k = k.reshape(k.size()[0],3,6,2,2)
         x3 = torch.cat((x3, k), axis=1)
 
 #kinematics should be 6144 large
@@ -314,7 +314,7 @@ class upSpecial(nn.Module):
         if trilinear:
             self.up = nn.Upsample(scale_factor=2, mode='trilinear', align_corners=True)
         else:
-            self.up = nn.ConvTranspose3d(320, 320, 2, stride=2)
+            self.up = nn.ConvTranspose3d(259, 256, 2, stride=2)
 
         self.conv = double_conv3D(in_ch, out_ch)
 

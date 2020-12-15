@@ -21,7 +21,7 @@ def add_gaussian_noise(mesh):
     return mesh + modifier#, kinematics + kn_noise
 
 class SimulatorDataset(Dataset):
-    def __init__(self, kinematics_path, simulator_path, fem_path, augment=False):
+    def __init__(self, kinematics_path, fem_path, augment=False):
         self.augment= augment
         self.kinematics_array = None
         for path in kinematics_path:
@@ -83,12 +83,14 @@ class SimulatorDataset(Dataset):
             fem = torch.from_numpy(fem).float()
 
         fem_next = torch.from_numpy(utils.reshape_volume(np.genfromtxt(self.fem_array[idx+1]))).float() - fem
+        print(kinematics)
+        print(torch.mean(fem_next[:]))
         return kinematics, fem, fem_next#, pc_last
 
 
 class SimulatorDatasetPC(SimulatorDataset):
-    def __init__(self, kinematics_path, simulator_path, label_path, fem_path, augment=False, pc_length=26000):
-        super(SimulatorDatasetPC, self).__init__(kinematics_path, simulator_path, label_path, fem_path, augment=False)
+    def __init__(self, kinematics_path, label_path, fem_path, augment=False, pc_length=26000):
+        super(SimulatorDatasetPC, self).__init__(kinematics_path, label_path, fem_path, augment=False)
         self.pc_length = pc_length
 
         self.label_array = []

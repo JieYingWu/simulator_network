@@ -95,3 +95,5 @@ def refine_mesh(mesh, factor, device):
 #    log.write(json.dumps(data, sort_keys=True))
 #    log.write('\n')
 #    log.flush()
+
+
