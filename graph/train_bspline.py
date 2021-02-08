@@ -10,30 +10,30 @@ from dataset import MeshGraphDataset
 from torch_geometric.data import Data, DataLoader
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
+
 root = Path("checkpoints")
-train_set = ['data2', 'data3', 'data4', 'data5', 'data6']#, 'data7', 'data8', 'data9', 'data10', 'data11']
+train_set = ['data3', 'data4',  'data6', 'data7', 'data8', 'data9', 'data10', 'data11']
 val_set = ['data0']
 # Testing on data1
-epoch_to_use = 20
-use_previous_model = True
+epoch_to_use = 316
+use_previous_model = False
 validate_each = 10
 n_epochs = 5000
-lr = 1e-2
-batch_size = 32
-model_choice = 'UNet'
+lr = 1e-7
+batch_size = 1
 
 ####### SET MODEL ########
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-model = GraphUNet(utils.IN_CHANNELS, 256, 3, utils.NET_DEPTH, sum_res=False).to(device)
+model = BSplineNet().to(device)
 
-optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 scheduler = ReduceLROnPlateau(optimizer)
 loss_fn = nn.MSELoss()
 
 try:
-    model_root = root / "UNet" / "models_more_data"
+    model_root = root / "b_spline" / "models_more_data"
     model_root.mkdir(mode=0o777, parents=False)
 except OSError:
     print("path exists")
@@ -73,8 +73,8 @@ train_label_path = []
 train_fem_path = []
     
 for v in train_set:
-    train_kinematics_path = train_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_velocity_fine.csv']
-    train_fem_path = train_fem_path + [path+'/simulator/5e3_fine_step/' + v + '/']
+    train_kinematics_path = train_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_velocity.csv']
+    train_fem_path = train_fem_path + [path+'/simulator/5e3_fine_mesh/' + v + '/']
     
 print(train_kinematics_path)
 val_kinematics_path = []
@@ -83,19 +83,18 @@ val_fem_path = []
 
 
 for v in val_set:
-    val_kinematics_path = val_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_velocity_fine.csv']
-    val_fem_path = val_fem_path + [path+'/simulator/5e3_fine_step/' + v + '/']
+    val_kinematics_path = val_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_velocity.csv']
+    val_fem_path = val_fem_path + [path+'/simulator/5e3_fine_mesh/' + v + '/']
 
-train_dataset = MeshGraphDataset(train_kinematics_path, train_fem_path, augment=False)
+train_dataset = MeshGraphDataset(train_kinematics_path, train_fem_path, augment=True)
 val_dataset = MeshGraphDataset(val_kinematics_path, val_fem_path)
-train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
+train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=False)
 val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False)
 
 try:    
     for e in range(epoch, n_epochs + 1):
         
         model.train()
-        train_dataset.__set_network__()
         
         tq = tqdm.tqdm(total=(len(train_loader) * batch_size))
         tq.set_description('Epoch {}, lr {}'.format(e, lr))
@@ -103,7 +102,7 @@ try:
         
         for i, (fem, corr) in enumerate(train_loader):
             fem, corr = fem.to(device), corr.to(device)
-            pred = model(fem.x, fem.edge_index, batch=fem.batch)
+            pred = model(fem)
             corrected = utils.correct(fem.x, pred, device)
             loss = loss_fn(corrected, corr.x)
             epoch_loss += loss.item()
@@ -128,7 +127,7 @@ try:
             with torch.no_grad():
                 for j, (fem, corr) in enumerate(val_loader):
                     fem, corr = fem.to(device), corr.to(device)
-                    pred = model(fem.x, fem.edge_index, batch=fem.batch)
+                    pred = model(fem)
                     corrected = utils.correct(fem.x, pred, device)
                     loss = loss_fn(corrected, corr.x)
                     mean_loss += loss.item()

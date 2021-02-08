@@ -1,14 +1,19 @@
 import json
 import torch
+import numpy as np
 from torch import nn
 from datetime import datetime
 
 
 FIELDS = 10
-IN_CHANNELS = 3
+IN_CHANNELS = 9
 OUT_CHANNELS = 3
+NET_DEPTH = 2
 DROPOUT = 0#.01
-VOL_SIZE = (25,9,9,3)
+VOL_SIZE = np.array([25,9,9,3])
+MAX_DIST = 30
+DIM = np.array([68.7, 35.8, 39.3], dtype=np.float32)
+scale = torch.tensor(DIM/VOL_SIZE[0:3]).type(torch.float32)*2
 
 def init_net(net, type="kaiming", mode="fan_in", activation_mode="relu", distribution="normal"):
     assert (torch.cuda.is_available())
@@ -30,24 +35,13 @@ def kaiming_weight_zero_bias(model, mode="fan_in", activation_mode="relu", distr
             if module.bias is not None:
                 torch.nn.init.constant_(module.bias, 0)
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-scale = torch.zeros((1,3), device=device)
-scale[0,:] = torch.tensor([2.34, 3.98, 4.37])
-def correct(mesh,x):
+def correct(mesh,x,device):
     x = x - 0.5
-    x = x*scale
+    x = x*scale.to(device)
 #    corrected = mesh + x
     return x#corrected
 
-scale_cpu = scale.cpu()
-def correct_cpu(mesh,x):
-    x = x - 0.5
-    x = x*scale_cpu
-#    corrected = mesh + x
-    return x#corrected
-
-
-def concat_mesh_kinematics(mesh, kinematics):
+def concat_mesh_kinematics(mesh, kinematics, device):
     kinematics = kinematics.view(kinematics.size()[0], kinematics.size()[1],1,1,1)
     # Just putting it on the top of the mesh
     kinematics = kinematics.repeat(1,1,mesh.size()[2],1,mesh.size()[4])

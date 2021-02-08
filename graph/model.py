@@ -1,12 +1,12 @@
 import torch
 import torch.nn.functional as F
 from torch_sparse import spspmm
-from torch_geometric.nn import TopKPooling, GCNConv
+from torch_geometric.nn import TopKPooling, GCNConv, SplineConv
 from torch_geometric.utils import (add_self_loops, sort_edge_index,
                                    remove_self_loops)
 from torch_geometric.utils.repeat import repeat
 
-
+num_nodes = 2025
 class GraphUNet(torch.nn.Module):
     r"""The Graph U-Net model from the `"Graph U-Nets"
     <https://arxiv.org/abs/1905.05178>`_ paper which implements a U-Net like
@@ -132,24 +132,25 @@ class GraphUNet(torch.nn.Module):
 
 class BSplineNet(torch.nn.Module):
     def __init__(self):
-        super(Net, self).__init__()
-        self.conv1 = SplineConv(1, 32, dim=3, kernel_size=5, aggr='add')
-        self.conv2 = SplineConv(32, 64, dim=3, kernel_size=5, aggr='add')
-        self.conv3 = SplineConv(64, 64, dim=3, kernel_size=5, aggr='add')
-        self.conv4 = SplineConv(64, 64, dim=3, kernel_size=5, aggr='add')
-        self.conv5 = SplineConv(64, 64, dim=3, kernel_size=5, aggr='add')
-        self.conv6 = SplineConv(64, 64, dim=3, kernel_size=5, aggr='add')
-        self.lin1 = torch.nn.Linear(64, 256)
-        self.lin2 = torch.nn.Linear(256, d.num_nodes)
-
-    def forward(self, x, edge_index, edge_attr):
-        x = F.elu(self.conv1(x, edge_index, pseudo))
-        x = F.elu(self.conv2(x, edge_index, pseudo))
-        x = F.elu(self.conv3(x, edge_index, pseudo))
-        x = F.elu(self.conv4(x, edge_index, pseudo))
-        x = F.elu(self.conv5(x, edge_index, pseudo))
-        x = F.elu(self.conv6(x, edge_index, pseudo))
-        x = F.elu(self.lin1(x))
-        x = F.dropout(x, training=self.training)
+        super(BSplineNet, self).__init__()
+        self.conv1 = SplineConv(6, 64, dim=3, kernel_size=5)
+#        self.conv2 = SplineConv(32, 64, dim=3, kernel_size=3)
+#        self.conv3 = SplineConv(64, 64, dim=6, kernel_size=6)
+#        self.conv4 = SplineConv(64, 64, dim=3, kernel_size=5, aggr='add')
+#        self.conv5 = SplineConv(64, 64, dim=3, kernel_size=5, aggr='add')
+#        self.conv6 = SplineConv(64, 64, dim=3, kernel_size=5, aggr='add')
+#        self.lin1 = torch.nn.Linear(64, 64)
+        self.lin2 = torch.nn.Linear(64, 3)
+        self.final_act = torch.sigmoid
+        
+    def forward(self, data):
+        x, edge_index, edge_attr = data.x, data.edge_index, data.edge_attr
+        x = F.elu(self.conv1(x, edge_index, edge_attr))
+#        x = F.elu(self.conv2(x, edge_index, edge_attr))
+#        x = F.elu(self.conv3(x, edge_index, edge_attr))
+#        x = F.elu(self.conv4(x, edge_index, edge_attr))
+#        x = F.elu(self.conv5(x, edge_index, edge_attr))
+#        x = F.elu(self.conv6(x, edge_index, edge_attr))
+#        x = F.elu(self.lin1(x))
         x = self.lin2(x)
-        return F.log_softmax(x, dim=1)
+        return self.final_act(x)
