@@ -13,7 +13,7 @@ DROPOUT = 0#.01
 VOL_SIZE = np.array([25,9,9,3])
 MAX_DIST = 30
 DIM = np.array([68.7, 35.8, 39.3], dtype=np.float32)
-scale = torch.tensor(DIM/VOL_SIZE[0:3]).type(torch.float32)*2
+scale = torch.tensor(DIM/VOL_SIZE[0:3]).type(torch.float32)
 
 def init_net(net, type="kaiming", mode="fan_in", activation_mode="relu", distribution="normal"):
     assert (torch.cuda.is_available())

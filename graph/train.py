@@ -11,14 +11,14 @@ from torch_geometric.data import Data, DataLoader
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 root = Path("checkpoints")
-train_set = ['data2', 'data3', 'data4', 'data5', 'data6']#, 'data7', 'data8', 'data9', 'data10', 'data11']
-val_set = ['data0']
+train_set = ['data2']#, 'data3', 'data4', 'data5', 'data6']#, 'data7', 'data8', 'data9', 'data10', 'data11']
+val_set = ['data3']
 # Testing on data1
-epoch_to_use = 20
+epoch_to_use = 70
 use_previous_model = True
 validate_each = 10
 n_epochs = 5000
-lr = 1e-2
+lr = 1e-4
 batch_size = 32
 model_choice = 'UNet'
 
@@ -33,7 +33,7 @@ scheduler = ReduceLROnPlateau(optimizer)
 loss_fn = nn.MSELoss()
 
 try:
-    model_root = root / "UNet" / "models_more_data"
+    model_root = root / "UNet" / "models_data2"
     model_root.mkdir(mode=0o777, parents=False)
 except OSError:
     print("path exists")

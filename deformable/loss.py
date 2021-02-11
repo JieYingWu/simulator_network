@@ -74,7 +74,7 @@ class MeshLoss2D(nn.Module):
         # get probabilities from logits
         loss = torch.zeros(network_mesh.size()[0]).to(self.device)
 
-        mesh = refine_mesh(network_mesh, 3, self.devic)
+        mesh = refine_mesh(network_mesh, 2, self.device)
         mesh = mesh.reshape(mesh.size()[0],mesh.size()[1],-1)
         mesh = mesh.permute(0,2,1).contiguous()
         pc = pc.permute(0,2,1).contiguous()

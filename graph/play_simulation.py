@@ -10,9 +10,6 @@ from model import GraphUNet
 all_time_steps = [0.0332, 0.0332, 0.0329, 0.0332, 0.0332, 0.0333, 0.0331, 0.0332, 0.0332, 0.0328, 0.0455, 0.0473] 
 
 device = torch.device('cpu') 
-ensemble_size = 0
-pc_length = 27000
-
 
 def closest_node(node, nodes):
     dist2 = torch.sum((nodes - node)**2, axis=1)
@@ -53,13 +50,14 @@ if __name__ == "__main__":
     ## Load kinematics ##
     base_dir = '../../dataset/2019-10-09-GelPhantom1/'
     folder_name = 'data' + str(data_file)
-    robot_pos = np.genfromtxt(base_dir + 'dvrk/' + folder_name  + '_robot_cartesian_velocity.csv', delimiter=',')
+    robot_pos = np.genfromtxt(base_dir + 'dvrk/' + folder_name  + '_robot_cartesian_velocity_fine.csv', delimiter=',')
     robot_pos = np.concatenate((robot_pos[:,1:4], robot_pos[:,8:11]), axis=1)
     robot_pos = torch.from_numpy(robot_pos).float().to(device)
+    robot_pos = robot_pos[::10,:]
     if len(sys.argv) == 2:
         network_path = Path('augmentation_model.pt')
     elif len(sys.argv) == 3:
-        network_path = Path('checkpoints/UNet/models_more_data/model_' + sys.argv[2] + '.pt')
+        network_path = Path('checkpoints/UNet/models_data2/model_' + sys.argv[2] + '.pt')
     else:
         print('Too many arguments')
         exit()

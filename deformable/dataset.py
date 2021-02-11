@@ -26,9 +26,9 @@ class SimulatorDataset(Dataset):
         self.kinematics_array = None
         for path in kinematics_path:
             if self.kinematics_array is None:
-                self.kinematics_array = np.genfromtxt(path, delimiter=',')[0:-1,1:utils.FIELDS+1]
+                self.kinematics_array = np.genfromtxt(path, delimiter=',')[:,1:utils.FIELDS+1]
             else:
-                self.kinematics_array = np.concatenate((self.kinematics_array, np.genfromtxt(path, delimiter=',')[0:-1,1:utils.FIELDS+1]))
+                self.kinematics_array = np.concatenate((self.kinematics_array, np.genfromtxt(path, delimiter=',')[:,1:utils.FIELDS+1]))
         self.kinematics_array = np.concatenate((self.kinematics_array[:,0:3], self.kinematics_array[:,7:10]), axis=1)
         self.kinematics_array = torch.from_numpy(self.kinematics_array).float()
                 
@@ -123,16 +123,17 @@ class SimulatorDatasetPC(SimulatorDataset):
         return kinematics, simulation, pc, fem#, pc_last
     
 class SimulatorDataset2D(Dataset):
-    def __init__(self, kinematics_path, simulator_path, label_path, augment=False, pc_length=30000):
+    def __init__(self, kinematics_path, simulator_path, label_path, augment=False, pc_length=26000):
         self.pc_length = pc_length
         self.augment = augment
         self.kinematics_array = None
         for path in  kinematics_path:
             if self.kinematics_array is None:
-                self.kinematics_array = np.genfromtxt(path, delimiter=',')
+                self.kinematics_array = np.genfromtxt(path, delimiter=',')[:,1:utils.FIELDS+1]
             else:
-                self.kinematics_array = np.concatenate((self.kinematics_array, np.genfromtxt(path, delimiter=',')))
+                self.kinematics_array = np.concatenate((self.kinematics_array, np.genfromtxt(path, delimiter=',')[:,1:utils.FIELDS+1]))
                 
+        self.kinematics_array = np.concatenate((self.kinematics_array[:,0:3], self.kinematics_array[:,7:10]), axis=1)                
         self.simulator_array = [] 
         for path in simulator_path:
             files = sorted(os.listdir(path))
@@ -162,10 +163,10 @@ class SimulatorDataset2D(Dataset):
         pc = np.transpose(pc, (1,0))
 #        print('Loading label took ' + str(time()-label_time) + ' s')        
          
-        return torch.from_numpy(self.kinematics_array[idx,1:]).float(), simulation, torch.from_numpy(pc).float()
+        return torch.from_numpy(self.kinematics_array[idx,:]).float(), simulation, torch.from_numpy(pc).float()
 
     def _reshape(self, x):
-        y = x.reshape(13, 5, 5, 3)
+        y = x.reshape(utils.VOL_SIZE)
         y = y.transpose((3, 0, 1, 2))
         y = y[:,:,-1,:]
         return y
@@ -176,6 +177,6 @@ class SimulatorDataset2D(Dataset):
         return padded
 
     def _truncate(self, x):
-        indices = torch.randperm(30000)
+        indices = torch.randperm(self.pc_length)
         truncated = x[indices, :]
         return truncated

@@ -60,23 +60,23 @@ class MeshGraphDataset(Dataset):
         self.kinematics_array = None
         for path in kinematics_path:
             if self.kinematics_array is None:
-                self.kinematics_array = np.genfromtxt(path, delimiter=',')[:,1:utils.FIELDS+1]
+                self.kinematics_array = np.genfromtxt(path, delimiter=',')[::10,1:utils.FIELDS+1]
             else:
-                self.kinematics_array = np.concatenate((self.kinematics_array, np.genfromtxt(path, delimiter=',')[:,1:utils.FIELDS+1]))
+                self.kinematics_array = np.concatenate((self.kinematics_array, np.genfromtxt(path, delimiter=',')[::10,1:utils.FIELDS+1]))
         self.kinematics_array = np.concatenate((self.kinematics_array[:,0:3], self.kinematics_array[:,7:10]), axis=1)
         self.kinematics_array = torch.from_numpy(self.kinematics_array).float()
 
         self.fem_array = []
         for path in fem_path:
-            files = sorted(os.listdir(path))
-            self.fem_array = self.fem_array + [path + x for x in files]
+            files = sorted(os.listdir(path))            
+            temp = [path + x for x in files]
+            self.fem_array = self.fem_array + temp[::10]
 
         base_mesh = 'mesh_fine.txt'
         self.base_mesh = torch.from_numpy(np.genfromtxt(base_mesh)).float()
 
         self.edge_index = utils.make_edges()
         self.augment = augment
-
         
     def __set_network__(self):
         network_path = Path('augmentation_model.pt')
