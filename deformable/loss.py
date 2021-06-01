@@ -2,7 +2,9 @@ import torch
 import numpy as np
 from torch import nn as nn
 from utils import refine_mesh
-from chamferdist.chamferdist import ChamferDistance
+#from chamfer3D.dist_chamfer_3D import chamfer_3DDist
+from chamferdist import ChamferDistance
+# chamfer dist from https://github.com/ThibaultGROUEIX/ChamferDistancePytorch
 
 import sys
 np.set_printoptions(threshold=sys.maxsize)
@@ -68,19 +70,23 @@ class MeshLoss2D(nn.Module):
         super(MeshLoss2D, self).__init__()
         self.batch_size = batch_size
         self.device = device
-        self.chamfer = ChamferDistance()
+        self.chamfer = ChamferDistance() #chamfer_3DDist()
 
-    def forward(self, network_mesh, pc):
+    def forward(self, vertices, pc):
         # get probabilities from logits
-        loss = torch.zeros(network_mesh.size()[0]).to(self.device)
-
-        mesh = refine_mesh(network_mesh, 2, self.device)
-        mesh = mesh.reshape(mesh.size()[0],mesh.size()[1],-1)
-        mesh = mesh.permute(0,2,1).contiguous()
-        pc = pc.permute(0,2,1).contiguous()
+        #fine_mesh = vertices
+        vertices = refine_mesh(vertices, 2, self.device)
+        n = vertices.size()[0]
+        top = vertices.reshape(n,3,-1)
+        top = top.permute(0, 2, 1)
+#        top = top[:,0,:].unsqueeze(1)
+#        pc = pc[:,0,:].unsqueeze(1)
         
-        dist1, dist2, idx1, idx2 = self.chamfer(mesh, pc)
-
-        # Average the Dice score across all channels/classes
-        return torch.mean(dist2)
+        dist= self.chamfer(pc, top)
+ #       print(dist1)
+ #       print(idx1)
+            # Only want pc -> mesh loss to ignore occluded regions
  
+        # Average the Dice score across all channels/classes
+#        return torch.mean(loss)
+        return dist

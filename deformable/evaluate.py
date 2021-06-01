@@ -19,7 +19,7 @@ loss_fn = ChamferDistance()
 
 #print('Using base mesh')
 print('Evaluating ', len(mesh_files), ' files')
-for i in range(len(mesh_files)-1):
+for i in range(len(mesh_files)):
     try:
         mesh = np.genfromtxt(mesh_path + mesh_files[i])
 #        mesh = np.genfromtxt(mesh_path + mesh_files[0])

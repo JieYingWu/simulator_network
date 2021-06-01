@@ -123,52 +123,95 @@ class SimulatorDatasetPC(SimulatorDataset):
         return kinematics, simulation, pc, fem#, pc_last
     
 class SimulatorDataset2D(Dataset):
-    def __init__(self, kinematics_path, simulator_path, label_path, augment=False, pc_length=26000):
+    def __init__(self, kinematics_path, simulator_path, label_path, augment=False, pc_length=24000):
         self.pc_length = pc_length
         self.augment = augment
         self.kinematics_array = None
         for path in  kinematics_path:
             if self.kinematics_array is None:
-                self.kinematics_array = np.genfromtxt(path, delimiter=',')[:,1:utils.FIELDS+1]
+                self.kinematics_array = np.genfromtxt(path, delimiter=',')
             else:
-                self.kinematics_array = np.concatenate((self.kinematics_array, np.genfromtxt(path, delimiter=',')[:,1:utils.FIELDS+1]))
-                
-        self.kinematics_array = np.concatenate((self.kinematics_array[:,0:3], self.kinematics_array[:,7:10]), axis=1)                
-        self.simulator_array = [] 
+                self.kinematics_array = np.concatenate((self.kinematics_array, np.genfromtxt(path, delimiter=',')))
+        self.kinematics_array = torch.from_numpy(self.kinematics_array[:,1:]).float()
+
+#        self.simulator_array = []
+        self.all_fem = None
         for path in simulator_path:
-            files = sorted(os.listdir(path))
-            self.simulator_array = self.simulator_array + [path + x for x in files]
-        self.label_array = []
-        
+            print(path)
+            fem = np.load(path[0:-1]+'.npy')
+            fem = self._reshape(fem)
+            fem = torch.from_numpy(fem).float()
+            if self.all_fem is None:
+                self.all_fem = fem
+            else:
+                self.all_fem = torch.cat((self.all_fem, fem), axis=0)
+#            files = sorted(os.listdir(path))
+#            self.simulator_array = self.simulator_array + [path + x for x in files]
+#            for x in files:
+#                fem = np.genfromtxt(path+x)
+#                fem = torch.from_numpy(fem).float()
+#                fem = fem.unsqueeze(0)
+#                if self.all_fem is None:
+#                    self.all_fem = fem
+#                else:
+#                    self.all_fem = torch.cat((self.all_fem, fem), axis=0)
+
+#        self.label_array = []
+
+        self.all_pc = None
         for path in label_path:
-            files = sorted(os.listdir(path))
-            self.label_array = self.label_array + [path + x for x in files]
-        
+#            files = sorted(os.listdir(path))
+            print(path)
+            pc = np.load(path[0:-1]+'.npy')
+            pc = torch.from_numpy(pc).float()
+#            pc = pc[0:-1,:,:]
+            if self.all_pc is None:
+                self.all_pc = pc
+            else:
+                self.all_pc = torch.cat((self.all_pc, pc), axis=0)
+
+#            self.label_array = self.label_array + [path + x for x in files]
+#            for x in files:
+#                pc = plyfile.PlyData.read(path+x)['vertex']
+#                pc = np.concatenate((np.expand_dims(pc['x'], 1), np.expand_dims(pc['y'],1), np.expand_dims(pc['z'],1)), 1)
+#                pc = self._truncate(pc)
+#                pc = torch.from_numpy(pc).float()
+#                pc = pc.unsqueeze(0)
+#                if self.all_pc is None:
+#                    self.all_pc = pc
+#                else:
+#                    self.all_pc = torch.cat((self.all_pc, pc), axis=0)
+
+            
     def __len__(self):
-        return len(self.simulator_array)
+        return self.all_fem.size()[0]
+        #return len(self.simulator_array)
 
     # return robot kinematics, mesh, and point cloud
     def __getitem__(self, idx):
 #        simulation_time = time()
-        simulation = np.genfromtxt(self.simulator_array[idx])
-        simulation = torch.from_numpy(self._reshape(simulation)).float()
+#        simulation = np.genfromtxt(self.simulator_array[idx])
+#        simulation = torch.from_numpy(self._reshape(simulation)).float()
+        simulation = self.all_fem[idx,:,:]
         if self.augment:
-            simulation  = add_gaussian_noise(simulation)
+            simulation = add_gaussian_noise(simulation)
 #        print('Loading simulation took ' + str(time()-simulations_time) + ' s')
 
 #        label_time = time()
-        pc = plyfile.PlyData.read(self.label_array[idx])['vertex']
-        pc = np.concatenate((np.expand_dims(pc['x'], 1), np.expand_dims(pc['y'],1), np.expand_dims(pc['z'],1)), 1)
-        pc = self._truncate(pc)
-        pc = np.transpose(pc, (1,0))
-#        print('Loading label took ' + str(time()-label_time) + ' s')        
+#        print('Loading label took ' + str(time()-label_time) + ' s')
+#        pc = plyfile.PlyData.read(self.label_array[idx])['vertex']
+ #       pc = np.concatenate((np.expand_dims(pc['x'], 1), np.expand_dims(pc['y'],1), np.expand_dims(pc['z'],1)), 1)
+ #       pc = self._truncate(pc)
+ #       pc = torch.from_numpy(pc).float()
+
+        pc = self.all_pc[idx,:,:]
          
-        return torch.from_numpy(self.kinematics_array[idx,:]).float(), simulation, torch.from_numpy(pc).float()
+        return self.kinematics_array[idx,:], simulation, pc
 
     def _reshape(self, x):
-        y = x.reshape(utils.VOL_SIZE)
-        y = y.transpose((3, 0, 1, 2))
-        y = y[:,:,-1,:]
+        y = x.reshape(-1, utils.VOL_SIZE[0], utils.VOL_SIZE[1], utils.VOL_SIZE[2], utils.VOL_SIZE[3])
+        y = y.transpose((0, 4, 1, 2, 3))
+        y = y[:,:,:,-1,:]
         return y
 
     def _pad(self, x):

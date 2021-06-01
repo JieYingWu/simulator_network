@@ -11,16 +11,17 @@ from torch_geometric.data import Data, DataLoader
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 root = Path("checkpoints")
-train_set = ['data2']#, 'data3', 'data4', 'data5', 'data6']#, 'data7', 'data8', 'data9', 'data10', 'data11']
-val_set = ['data3']
+train_set = ['data2', 'data3', 'data4', 'data5', 'data6', 'data7', 'data8', 'data9']#, 'data10', 'data11']
+val_set = ['data0']
 # Testing on data1
-epoch_to_use = 70
+epoch_to_use = 50 # Made step size bigger at 470, Added augmentatio in 700
 use_previous_model = True
 validate_each = 10
 n_epochs = 5000
 lr = 1e-4
-batch_size = 32
-model_choice = 'UNet'
+batch_size = 16
+momentum = 0.9
+augment = True
 
 ####### SET MODEL ########
 
@@ -28,12 +29,12 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 model = GraphUNet(utils.IN_CHANNELS, 256, 3, utils.NET_DEPTH, sum_res=False).to(device)
 
-optimizer = torch.optim.SGD(model.parameters(), lr=lr)
+optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=momentum)
 scheduler = ReduceLROnPlateau(optimizer)
 loss_fn = nn.MSELoss()
 
 try:
-    model_root = root / "UNet" / "models_data2"
+    model_root = root / "UNet" / "fine_mesh_half_step"
     model_root.mkdir(mode=0o777, parents=False)
 except OSError:
     print("path exists")
@@ -73,8 +74,8 @@ train_label_path = []
 train_fem_path = []
     
 for v in train_set:
-    train_kinematics_path = train_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_velocity_fine.csv']
-    train_fem_path = train_fem_path + [path+'/simulator/5e3_fine_step/' + v + '/']
+    train_kinematics_path = train_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_velocity.csv']
+    train_fem_path = train_fem_path + [path+'/simulator/5e3_fine_mesh/' + v + '/']
     
 print(train_kinematics_path)
 val_kinematics_path = []
@@ -83,10 +84,10 @@ val_fem_path = []
 
 
 for v in val_set:
-    val_kinematics_path = val_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_velocity_fine.csv']
-    val_fem_path = val_fem_path + [path+'/simulator/5e3_fine_step/' + v + '/']
+    val_kinematics_path = val_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_velocity.csv']
+    val_fem_path = val_fem_path + [path+'/simulator/5e3_fine_mesh/' + v + '/']
 
-train_dataset = MeshGraphDataset(train_kinematics_path, train_fem_path, augment=False)
+train_dataset = MeshGraphDataset(train_kinematics_path, train_fem_path, augment=augment)
 val_dataset = MeshGraphDataset(val_kinematics_path, val_fem_path)
 train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
 val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False)
@@ -95,7 +96,8 @@ try:
     for e in range(epoch, n_epochs + 1):
         
         model.train()
-        train_dataset.__set_network__()
+        if augment:
+            train_dataset.__set_network__()
         
         tq = tqdm.tqdm(total=(len(train_loader) * batch_size))
         tq.set_description('Epoch {}, lr {}'.format(e, lr))
@@ -117,8 +119,8 @@ try:
         mean_loss = epoch_loss/len(train_loader)
         tq.set_postfix(loss=' loss={:.5f}'.format(mean_loss))
 
-        model_path = "augmentation_model.pt"
-        save(e, model, model_path, mean_loss, optimizer, scheduler)
+#        model_path = "augmentation_model.pt"
+#        save(e, model, model_path, mean_loss, optimizer, scheduler)
         
         if e % validate_each == 0:
             torch.cuda.empty_cache()
@@ -140,7 +142,10 @@ try:
             best_mean_rec_loss = mean_loss
             model_path = model_root / "model_{}.pt".format(e)
             save(e, model, model_path, best_mean_rec_loss, optimizer, scheduler)
-            
+
+            model_path = "augmentation_model.pt"
+            save(e, model, model_path, mean_loss, optimizer, scheduler)
+
                     
         tq.close()
 

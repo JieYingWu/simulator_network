@@ -101,8 +101,8 @@ class UNet(nn.Module):
         self.down1 = down(64, 128)
         self.down2 = down(128, 256)
 #        self.down3 = down(256, 256)
-        self.up2 = up(512, 128)
-        self.up3 = up(390, 64)
+#        self.up2 = up(519, 128)
+        self.up3 = up(391, 64)
         self.up4 = up(128, 64)
         self.outc = outconv(64, out_channels)
 

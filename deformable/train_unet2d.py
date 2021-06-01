@@ -15,17 +15,16 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 scale = utils.scale.cuda()[:,:,:,:,0]
 
 def correct(mesh,x):
-    corrected = mesh.clone()
     x = (x-0.5)*scale
     corrected = mesh + x
     return corrected
 
 if __name__ == '__main__':
-
     device = torch.device("cuda")
     root = Path("checkpoints")
-    num_workers = 4
-    train_set = ['data3', 'data4', 'data5', 'data6', 'data7', 'data8', 'data9']#, 'data10', 'data11']
+    folder = '5e3_net'
+    num_workers = 2
+    train_set = ['data2', 'data3', 'data4', 'data5', 'data6', 'data7', 'data8', 'data9']#, 'data10', 'data11']
     val_set = ['data0']
     # Testing on data1 and data2
     
@@ -34,8 +33,8 @@ if __name__ == '__main__':
     train_simulator_path = []
     train_label_path = []
     for v in train_set:
-        train_kinematics_path = train_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_velocity.csv']
-        train_simulator_path = train_simulator_path + [path+'/simulator/5e3_fine_mesh/' + v + '/']
+        train_kinematics_path = train_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_processed_interpolated.csv']
+        train_simulator_path = train_simulator_path + [path+'/simulator/' + folder + '/' + v + '/']
         train_label_path = train_label_path + [path+'/camera/' + v + '_filtered/']
 
     print(train_kinematics_path)
@@ -43,18 +42,18 @@ if __name__ == '__main__':
     val_simulator_path = []
     val_label_path = []
     for v in val_set:
-        val_kinematics_path = val_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_velocity.csv']
-        val_simulator_path = val_simulator_path + [path+'/simulator/5e3_fine_mesh/' + v + '/']
+        val_kinematics_path = val_kinematics_path + [path+'/dvrk/' + v + '_robot_cartesian_processed_interpolated.csv']
+        val_simulator_path = val_simulator_path + [path+'/simulator/' + folder + '/' + v + '/']
         val_label_path = val_label_path + [path+'/camera/' + v + '_filtered/']
 
-    epoch_to_use = 23
+    epoch_to_use = 30
     use_previous_model = False
     validate_each = 10
     
     in_channels = 3
     out_channels = 3
     batch_size = 128
-    lr = 1.0e-5
+    lr = 1.0e-6
     n_epochs = 500
     momentum=0.9
 
@@ -64,14 +63,14 @@ if __name__ == '__main__':
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     
     model = UNet(in_channels=in_channels, out_channels=out_channels).to(device)
-#    model = utils.init_net(model)
+    model = utils.init_net(model)
 
     loss_fn = MeshLoss2D(batch_size, device)
     optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum) 
     scheduler = ReduceLROnPlateau(optimizer)
 
     try:
-        model_root = root / "models2d_correction"
+        model_root = root / "models2d_net_correction"
         model_root.mkdir(mode=0o777, parents=False)
     except OSError:
         print("path exists")
@@ -137,7 +136,7 @@ if __name__ == '__main__':
                 with torch.no_grad():
                     model.eval()
                     for j, (kinematics, mesh, label) in enumerate(val_loader):
-                        kinematics, mesh, label = kinematics.to(device), mesh.to(device), label
+                        kinematics, mesh, label = kinematics.to(device), mesh.to(device), label.to(device)
                         pred = model(kinematics, mesh)
                         corrected = correct(mesh, pred)
                         loss = loss_fn(corrected, label)
